@@ -242,13 +242,12 @@
       } catch (e) {}
     }
 
-    // 調色盤狀態
-    let activePaletteTarget = null; // { projId, weekId, inputEl }
+    // 調色盤控制邏輯
+    let activePaletteTarget = null;
 
     function openColorPalette(projId, weekId, btnEl) {
       const proj = projects.find(p => p.id === projId);
       const mItem = (proj && proj.milestones && proj.milestones[weekId]) || '';
-      const textVal = typeof mItem === 'object' ? (mItem.text || '') : mItem;
       const curBg = (typeof mItem === 'object' && mItem.bg) ? mItem.bg : '#ffffff';
       const curColor = (typeof mItem === 'object' && mItem.color) ? mItem.color : '#0f172a';
 
@@ -373,12 +372,9 @@
 
       const app = document.getElementById('app');
       app.innerHTML = `
-        <!-- 頂部導航列 (RWD 自適應) -->
         <header class="no-print bg-white rounded-xl shadow-sm border border-slate-200 p-3 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div class="flex items-center gap-3">
-            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-teal-700 flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-sm flex-shrink-0">
-              PM
-            </div>
+            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-teal-700 flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-sm flex-shrink-0">PM</div>
             <div>
               <h1 class="text-base sm:text-lg md:text-xl font-bold text-slate-800 tracking-tight flex items-center gap-1.5 sm:gap-2">
                 <span>PM weekly report 專案管理系統</span>
@@ -390,36 +386,17 @@
 
           <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <div class="bg-slate-100 p-0.5 sm:p-1 rounded-lg flex text-[11px] sm:text-xs font-semibold border border-slate-200">
-              <button onclick="setViewMode('both')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'both' ? 'bg-white text-teal-800 shadow-sm font-bold' : 'text-slate-600'}">
-                雙模式
-              </button>
-              <button onclick="setViewMode('master')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'master' ? 'bg-white text-teal-800 shadow-sm font-bold' : 'text-slate-600'}">
-                總排程
-              </button>
-              <button onclick="setViewMode('detail')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'detail' ? 'bg-white text-teal-800 shadow-sm font-bold' : 'text-slate-600'}">
-                單頁週報
-              </button>
+              <button onclick="setViewMode('both')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'both' ? 'bg-white text-teal-800 shadow-sm font-bold' : 'text-slate-600'}">雙模式</button>
+              <button onclick="setViewMode('master')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'master' ? 'bg-white text-teal-800 shadow-sm font-bold' : 'text-slate-600'}">總排程</button>
+              <button onclick="setViewMode('detail')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'detail' ? 'bg-white text-teal-800 shadow-sm font-bold' : 'text-slate-600'}">單頁週報</button>
             </div>
-
-            <button onclick="addNewProject()" class="bg-teal-700 hover:bg-teal-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition">
-              + 治具
-            </button>
-
-            <button onclick="openPrintModal()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-1">
-              <span>📄</span><span>匯出 PDF</span>
-            </button>
-
-            <button onclick="openDedicatedPrintWindow()" class="bg-slate-800 hover:bg-slate-900 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition hidden sm:inline-block">
-              列印
-            </button>
-
-            <button onclick="resetToInitialData()" class="text-[11px] sm:text-xs text-rose-600 hover:bg-rose-50 px-2 py-1.5 rounded-lg transition">
-              恢復報告資訊
-            </button>
+            <button onclick="addNewProject()" class="bg-teal-700 hover:bg-teal-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition">+ 治具</button>
+            <button onclick="openPrintModal()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-1"><span>📄</span><span>匯出 PDF</span></button>
+            <button onclick="openDedicatedPrintWindow()" class="bg-slate-800 hover:bg-slate-900 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition hidden sm:inline-block">列印</button>
+            <button onclick="resetToInitialData()" class="text-[11px] sm:text-xs text-rose-600 hover:bg-rose-50 px-2 py-1.5 rounded-lg transition">恢復報告資訊</button>
           </div>
         </header>
 
-        <!-- 模組一：總排程主表 (Master Schedule) -->
         <section id="section-master" class="${viewMode === 'detail' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div class="p-3 sm:p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
             <div class="flex items-center gap-2">
@@ -427,14 +404,9 @@
               <h2 class="text-sm sm:text-base font-bold text-slate-800 tracking-tight">PM weekly report</h2>
               <span class="text-[11px] sm:text-xs text-slate-400">（共 ${projects.length} 項治具，點選「專案」切換週報，點擊 🎨 設定醒目顏色）</span>
             </div>
-
             <div class="no-print flex items-center gap-1.5 sm:gap-2">
-              <button onclick="addNewWeek()" class="text-[11px] sm:text-xs bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-md transition">
-                + 新增週次
-              </button>
-              <button onclick="addNewProject()" class="text-[11px] sm:text-xs bg-teal-600 hover:bg-teal-700 text-white font-medium px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-md transition">
-                + 新增治具
-              </button>
+              <button onclick="addNewWeek()" class="text-[11px] sm:text-xs bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-md transition">+ 新增週次</button>
+              <button onclick="addNewProject()" class="text-[11px] sm:text-xs bg-teal-600 hover:bg-teal-700 text-white font-medium px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-md transition">+ 新增治具</button>
             </div>
           </div>
 
@@ -456,9 +428,7 @@
                   <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[50px]">SW</th>
                   <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[50px]">FAE</th>
                   ${monthGroups.map(mg => `
-                    <th colSpan="${mg.span}" class="p-1 border-r border-slate-300 text-center font-bold text-slate-800 bg-slate-300 tracking-wider text-[11px]">
-                      ${mg.month}
-                    </th>
+                    <th colSpan="${mg.span}" class="p-1 border-r border-slate-300 text-center font-bold text-slate-800 bg-slate-300 tracking-wider text-[11px]">${mg.month}</th>
                   `).join('')}
                   <th rowSpan="2" class="no-print p-2 min-w-[85px] bg-slate-200">操作</th>
                 </tr>
@@ -484,44 +454,20 @@
                       <td class="p-1 border-r border-slate-200 cursor-pointer sticky-col-1" onclick="selectProject('${proj.id}')" title="點擊切換下方週報">
                         <input type="text" value="${proj.project || ''}" onblur="commitField('${proj.id}', 'project', this.value)" class="w-full bg-transparent text-center font-bold text-teal-900 focus:bg-white rounded py-1" />
                       </td>
-                      <td class="p-1 border-r border-slate-200">
-                        <input type="text" value="${proj.location || ''}" onblur="commitField('${proj.id}', 'location', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1" />
-                      </td>
-                      <td class="p-1 border-r border-slate-200">
-                        <input type="text" value="${proj.cm || ''}" onblur="commitField('${proj.id}', 'cm', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1" />
-                      </td>
-                      <td class="p-1 border-r border-slate-200">
-                        <input type="text" value="${proj.phase || ''}" onblur="commitField('${proj.id}', 'phase', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 font-semibold text-slate-700" />
-                      </td>
-                      <td class="p-1 border-r border-slate-200 text-left pl-2">
-                        <input type="text" value="${proj.fixture || ''}" onblur="commitField('${proj.id}', 'fixture', this.value)" class="w-full bg-transparent focus:bg-white rounded py-1 px-1 font-medium text-slate-900" />
-                      </td>
-                      <td class="p-1 border-r border-slate-200">
-                        <input type="text" value="${proj.status || ''}" onblur="commitField('${proj.id}', 'status', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 font-bold ${
-                          proj.status === '完成' ? 'text-emerald-700' : (proj.status === '組裝' ? 'text-amber-700' : 'text-sky-700')
-                        }" />
-                      </td>
-                      <td class="p-1 border-r border-slate-200">
-                        <input type="text" value="${proj.deadline || ''}" onblur="commitField('${proj.id}', 'deadline', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-rose-700 font-semibold" />
-                      </td>
-                      <td class="p-1 border-r border-slate-200">
-                        <input type="text" value="${proj.pm || ''}" onblur="commitField('${proj.id}', 'pm', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1" />
-                      </td>
-                      <td class="p-1 border-r border-slate-200">
-                        <input type="text" value="${proj.tpe_rd || ''}" onblur="commitField('${proj.id}', 'tpe_rd', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1" />
-                      </td>
-                      <td class="p-1 border-r border-slate-200">
-                        <input type="text" value="${proj.tt_ee || ''}" onblur="commitField('${proj.id}', 'tt_ee', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-400" />
-                      </td>
-                      <td class="p-1 border-r border-slate-200">
-                        <input type="text" value="${proj.me || ''}" onblur="commitField('${proj.id}', 'me', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1" />
-                      </td>
-                      <td class="p-1 border-r border-slate-200">
-                        <input type="text" value="${proj.sw || ''}" onblur="commitField('${proj.id}', 'sw', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-400" />
-                      </td>
-                      <td class="p-1 border-r border-slate-200">
-                        <input type="text" value="${proj.fae || ''}" onblur="commitField('${proj.id}', 'fae', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-400" />
-                      </td>
+                      <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.location || ''}" onblur="commitField('${proj.id}', 'location', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1" /></td>
+                      <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.cm || ''}" onblur="commitField('${proj.id}', 'cm', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1" /></td>
+                      <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.phase || ''}" onblur="commitField('${proj.id}', 'phase', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 font-semibold text-slate-700" /></td>
+                      <td class="p-1 border-r border-slate-200 text-left pl-2"><input type="text" value="${proj.fixture || ''}" onblur="commitField('${proj.id}', 'fixture', this.value)" class="w-full bg-transparent focus:bg-white rounded py-1 px-1 font-medium text-slate-900" /></td>
+                      <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.status || ''}" onblur="commitField('${proj.id}', 'status', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 font-bold ${
+                        proj.status === '完成' ? 'text-emerald-700' : (proj.status === '組裝' ? 'text-amber-700' : 'text-sky-700')
+                      }" /></td>
+                      <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.deadline || ''}" onblur="commitField('${proj.id}', 'deadline', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-rose-700 font-semibold" /></td>
+                      <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.pm || ''}" onblur="commitField('${proj.id}', 'pm', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1" /></td>
+                      <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.tpe_rd || ''}" onblur="commitField('${proj.id}', 'tpe_rd', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1" /></td>
+                      <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.tt_ee || ''}" onblur="commitField('${proj.id}', 'tt_ee', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-400" /></td>
+                      <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.me || ''}" onblur="commitField('${proj.id}', 'me', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1" /></td>
+                      <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.sw || ''}" onblur="commitField('${proj.id}', 'sw', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-400" /></td>
+                      <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.fae || ''}" onblur="commitField('${proj.id}', 'fae', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-400" /></td>
                       ${weeks.map(w => {
                         const mItem = (proj.milestones && proj.milestones[w.id]) || '';
                         const textVal = typeof mItem === 'object' ? (mItem.text || '') : mItem;
@@ -552,7 +498,6 @@
                                 class="w-full text-center text-[10px] leading-tight py-1 pr-3 focus:bg-white rounded ${badgeStyle}" 
                                 ${styleAttr}
                               />
-                              <!-- 調色盤觸發小按鈕 -->
                               <button 
                                 type="button" 
                                 title="變更文字色彩與醒目標籤"
@@ -579,64 +524,40 @@
           </div>
         </section>
 
-        <!-- 模組二：標準單頁週報卡片 (Full Report) -->
         <section id="section-detail" class="${viewMode === 'master' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border-2 border-teal-800 overflow-hidden">
           <div class="bg-teal-800 text-white p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
               <span class="bg-white/20 text-white text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded flex-shrink-0">Weekly Report</span>
-              <input
-                type="text"
-                value="NPI Project (${curProj.fixture || '治具名稱'}) - ${curProj.phase || '階段'}"
-                onblur="commitFixtureTitle('${curProj.id}', this.value)"
-                class="bg-transparent font-bold text-base sm:text-lg text-white border-b border-transparent hover:border-white/50 focus:border-white focus:outline-none flex-1 min-w-[200px]"
-              />
+              <input type="text" value="NPI Project (${curProj.fixture || '治具名稱'}) - ${curProj.phase || '階段'}" onblur="commitFixtureTitle('${curProj.id}', this.value)" class="bg-transparent font-bold text-base sm:text-lg text-white border-b border-transparent hover:border-white/50 focus:border-white focus:outline-none flex-1 min-w-[200px]" />
             </div>
 
             <div class="no-print flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
               <div class="flex items-center gap-1.5 flex-1 sm:flex-initial">
                 <span class="text-xs text-teal-200 hidden md:inline">切換治具：</span>
                 <select onchange="selectProject(this.value)" class="bg-teal-900 text-white text-xs px-2 py-1.5 rounded border border-teal-700 focus:outline-none w-full sm:w-auto">
-                  ${projects.map(p => `
-                    <option value="${p.id}" ${p.id === curProj.id ? 'selected' : ''}>
-                      ${p.fixture || '未命名治具'} (${p.phase || 'N/A'})
-                    </option>
-                  `).join('')}
+                  ${projects.map(p => `<option value="${p.id}" ${p.id === curProj.id ? 'selected' : ''}>${p.fixture || '未命名治具'} (${p.phase || 'N/A'})</option>`).join('')}
                 </select>
               </div>
-
-              <button onclick="deleteProject('${curProj.id}')" class="text-xs bg-rose-600 hover:bg-rose-700 text-white px-2.5 py-1.5 rounded transition flex-shrink-0">
-                刪除
-              </button>
+              <button onclick="deleteProject('${curProj.id}')" class="text-xs bg-rose-600 hover:bg-rose-700 text-white px-2.5 py-1.5 rounded transition flex-shrink-0">刪除</button>
             </div>
           </div>
 
           <div class="p-3 sm:p-4 md:p-6 space-y-4 text-xs">
-            <!-- 1. Stakeholders -->
             <div class="border border-slate-300 rounded-lg overflow-hidden">
               <div class="grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-slate-300">
                 <div class="md:col-span-2 bg-slate-100 font-bold p-2 text-slate-700 flex items-center text-[11px] sm:text-xs">Customer/CM</div>
-                <div class="md:col-span-4 p-1.5">
-                  <input type="text" value="${curProj.customer || ''}" placeholder="客戶代號 / 工廠" onblur="commitField('${curProj.id}', 'customer', this.value)" class="w-full p-1 bg-transparent focus:bg-slate-50 rounded" />
-                </div>
+                <div class="md:col-span-4 p-1.5"><input type="text" value="${curProj.customer || ''}" placeholder="客戶代號 / 工廠" onblur="commitField('${curProj.id}', 'customer', this.value)" class="w-full p-1 bg-transparent focus:bg-slate-50 rounded" /></div>
                 <div class="md:col-span-2 bg-slate-100 font-bold p-2 text-slate-700 flex items-center text-[11px] sm:text-xs border-t md:border-t-0 border-slate-300">Contact (Customer)</div>
-                <div class="md:col-span-4 p-1.5">
-                  <input type="text" value="${curProj.contact_customer || ''}" placeholder="DRI - 聯絡人" onblur="commitField('${curProj.id}', 'contact_customer', this.value)" class="w-full p-1 bg-transparent focus:bg-slate-50 rounded" />
-                </div>
+                <div class="md:col-span-4 p-1.5"><input type="text" value="${curProj.contact_customer || ''}" placeholder="DRI - 聯絡人" onblur="commitField('${curProj.id}', 'contact_customer', this.value)" class="w-full p-1 bg-transparent focus:bg-slate-50 rounded" /></div>
               </div>
-
               <div class="grid grid-cols-1 md:grid-cols-12 border-t border-slate-300 divide-y md:divide-y-0 md:divide-x divide-slate-300">
                 <div class="md:col-span-2 bg-slate-100 font-bold p-2 text-slate-700 flex items-center text-[11px] sm:text-xs">Competitor</div>
-                <div class="md:col-span-4 p-1.5">
-                  <input type="text" value="${curProj.competitor || 'NA'}" onblur="commitField('${curProj.id}', 'competitor', this.value)" class="w-full p-1 bg-transparent focus:bg-slate-50 rounded" />
-                </div>
+                <div class="md:col-span-4 p-1.5"><input type="text" value="${curProj.competitor || 'NA'}" onblur="commitField('${curProj.id}', 'competitor', this.value)" class="w-full p-1 bg-transparent focus:bg-slate-50 rounded" /></div>
                 <div class="md:col-span-2 bg-slate-100 font-bold p-2 text-slate-700 flex items-center text-[11px] sm:text-xs border-t md:border-t-0 border-slate-300">TT Resources</div>
-                <div class="md:col-span-4 p-1.5">
-                  <input type="text" value="${curProj.tt_resources || ''}" placeholder="AM / PM / RD / ME 名單" onblur="commitField('${curProj.id}', 'tt_resources', this.value)" class="w-full p-1 bg-transparent focus:bg-slate-50 rounded" />
-                </div>
+                <div class="md:col-span-4 p-1.5"><input type="text" value="${curProj.tt_resources || ''}" placeholder="AM / PM / RD / ME 名單" onblur="commitField('${curProj.id}', 'tt_resources', this.value)" class="w-full p-1 bg-transparent focus:bg-slate-50 rounded" /></div>
               </div>
             </div>
 
-            <!-- 2. Demand & PO/PR 查核矩陣 -->
             <div class="border border-slate-300 rounded-lg overflow-hidden">
               <div class="bg-slate-100 px-3 py-2 font-bold text-slate-800 border-b border-slate-300 flex items-center justify-between text-xs">
                 <span>Demand & PO/PR 查核矩陣</span>
@@ -663,29 +584,15 @@
                   <tbody class="divide-y divide-slate-200">
                     ${(curProj.demands || []).map(d => `
                       <tr class="hover:bg-slate-50/70">
-                        <td class="p-1.5 border-r border-slate-200 text-left pl-2">
-                          <input type="text" value="${d.demand || ''}" placeholder="需求治具品名" onblur="commitDemand('${curProj.id}', '${d.id}', 'demand', this.value)" class="w-full p-1 bg-transparent focus:bg-white rounded" />
-                        </td>
-                        <td class="p-1 border-r border-slate-200">
-                          <input type="text" value="${d.qty || ''}" placeholder="1" onblur="commitDemand('${curProj.id}', '${d.id}', 'qty', this.value)" class="w-full text-center p-1 bg-transparent focus:bg-white rounded" />
-                        </td>
-                        <td class="p-1 border-r border-slate-200">
-                          <input type="text" value="${d.site || ''}" placeholder="廠區" onblur="commitDemand('${curProj.id}', '${d.id}', 'site', this.value)" class="w-full text-center p-1 bg-transparent focus:bg-white rounded" />
-                        </td>
-                        <td class="p-1 border-r border-slate-200">
-                          <input type="text" value="${d.etd || ''}" placeholder="出貨日" onblur="commitDemand('${curProj.id}', '${d.id}', 'etd', this.value)" class="w-full text-center p-1 bg-transparent focus:bg-white rounded" />
-                        </td>
-                        <td class="p-1 border-r border-slate-200">
-                          <input type="text" value="${d.eta || ''}" placeholder="到廠日" onblur="commitDemand('${curProj.id}', '${d.id}', 'eta', this.value)" class="w-full text-center p-1 bg-transparent focus:bg-white rounded text-rose-600 font-semibold" />
-                        </td>
+                        <td class="p-1.5 border-r border-slate-200 text-left pl-2"><input type="text" value="${d.demand || ''}" placeholder="需求治具品名" onblur="commitDemand('${curProj.id}', '${d.id}', 'demand', this.value)" class="w-full p-1 bg-transparent focus:bg-white rounded" /></td>
+                        <td class="p-1 border-r border-slate-200"><input type="text" value="${d.qty || ''}" placeholder="1" onblur="commitDemand('${curProj.id}', '${d.id}', 'qty', this.value)" class="w-full text-center p-1 bg-transparent focus:bg-white rounded" /></td>
+                        <td class="p-1 border-r border-slate-200"><input type="text" value="${d.site || ''}" placeholder="廠區" onblur="commitDemand('${curProj.id}', '${d.id}', 'site', this.value)" class="w-full text-center p-1 bg-transparent focus:bg-white rounded" /></td>
+                        <td class="p-1 border-r border-slate-200"><input type="text" value="${d.etd || ''}" placeholder="出貨日" onblur="commitDemand('${curProj.id}', '${d.id}', 'etd', this.value)" class="w-full text-center p-1 bg-transparent focus:bg-white rounded" /></td>
+                        <td class="p-1 border-r border-slate-200"><input type="text" value="${d.eta || ''}" placeholder="到廠日" onblur="commitDemand('${curProj.id}', '${d.id}', 'eta', this.value)" class="w-full text-center p-1 bg-transparent focus:bg-white rounded text-rose-600 font-semibold" /></td>
                         ${['dfm', 'quote', 'pr_po', 'ko', 'bom', 'sw_key'].map(fKey => `
-                          <td class="p-1 border-r border-slate-200">
-                            <input type="checkbox" ${d[fKey] ? 'checked' : ''} onchange="commitDemand('${curProj.id}', '${d.id}', '${fKey}', this.checked)" class="w-4 h-4 text-teal-600 rounded cursor-pointer" />
-                          </td>
+                          <td class="p-1 border-r border-slate-200"><input type="checkbox" ${d[fKey] ? 'checked' : ''} onchange="commitDemand('${curProj.id}', '${d.id}', '${fKey}', this.checked)" class="w-4 h-4 text-teal-600 rounded cursor-pointer" /></td>
                         `).join('')}
-                        <td class="no-print p-1">
-                          <button onclick="deleteDemand('${curProj.id}', '${d.id}')" class="text-slate-400 hover:text-rose-600 p-1 font-bold">×</button>
-                        </td>
+                        <td class="no-print p-1"><button onclick="deleteDemand('${curProj.id}', '${d.id}')" class="text-slate-400 hover:text-rose-600 p-1 font-bold">×</button></td>
                       </tr>
                     `).join('')}
                   </tbody>
@@ -693,19 +600,16 @@
               </div>
             </div>
 
-            <!-- 3. Schedule 說明 -->
             <div class="border border-slate-300 rounded-lg p-2.5 sm:p-3 bg-slate-50/50">
               <div class="font-bold text-slate-800 mb-1 text-xs">Schedule（時程細節與排程摘要）</div>
               <input type="text" value="${curProj.schedule_desc || ''}" placeholder="例如: 需求 11/4 ETA 交付工廠，數量 2 套" onblur="commitField('${curProj.id}', 'schedule_desc', this.value)" class="w-full p-2 bg-white border border-slate-300 rounded focus:ring-1 focus:ring-teal-500 focus:outline-none text-xs" />
             </div>
 
-            <!-- 4. Project Progress (Process 週記日誌) -->
             <div class="border border-slate-300 rounded-lg overflow-hidden">
               <div class="bg-slate-100 px-3 py-2 font-bold text-slate-800 border-b border-slate-300 flex items-center justify-between text-xs">
                 <span>Project Progress (Process 歷程日誌)</span>
                 <button onclick="addLog('${curProj.id}')" class="no-print text-xs text-teal-700 hover:text-teal-900 font-semibold">+ 新增週次日誌</button>
               </div>
-
               <div class="p-2 sm:p-3 space-y-2.5 max-h-[380px] overflow-y-auto touch-scroll">
                 ${(curProj.progress_logs || []).map(log => `
                   <div class="border border-slate-200 rounded-lg p-2 sm:p-2.5 bg-slate-50/60 relative group">
@@ -722,13 +626,11 @@
               </div>
             </div>
 
-            <!-- 5. Special Issue & To-do Plan -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <div class="border border-amber-300 bg-amber-50/30 rounded-lg p-2.5 sm:p-3">
                 <div class="font-bold text-amber-900 mb-1 text-xs">Special Issue / Highlight / Call Help</div>
                 <textarea rows="3" onblur="commitField('${curProj.id}', 'special_issue', this.value)" class="w-full text-xs p-2 bg-white border border-amber-200 rounded focus:ring-1 focus:ring-amber-500 focus:outline-none">${curProj.special_issue || ''}</textarea>
               </div>
-
               <div class="border border-teal-300 bg-teal-50/30 rounded-lg p-2.5 sm:p-3">
                 <div class="font-bold text-teal-900 mb-1 text-xs">To-do plan（下週待辦行動方案）</div>
                 <textarea rows="3" onblur="commitField('${curProj.id}', 'todo_plan', this.value)" class="w-full text-xs p-2 bg-white border border-teal-200 rounded focus:ring-1 focus:ring-teal-500 focus:outline-none">${curProj.todo_plan || ''}</textarea>
@@ -783,7 +685,7 @@
     }
 
     function commitFixtureTitle(projId, rawTitle) {
-      const fixtureName = rawTitle.replace(/^NPI Project \(/, '').replace(/\) - .*$/, '');
+      const fixtureName = rawTitle.replace(/^NPI Project \(凸?/, '').replace(/\) - .*$/, '');
       commitField(projId, 'fixture', fixtureName);
     }
 
@@ -912,7 +814,10 @@
     }
 
     function deleteLog(projId, logId) {
-      projects = projects.map(p => p.id === projId ? { ...p, progress_logs: (p.progress_logs || []).filter(l => l.id !== logId) } : p);
+      projects = projects.map(p => {
+        if (p.id !== projId) return p;
+        return { ...p, progress_logs: (p.progress_logs || []).filter(l => l.id !== logId) };
+      });
       renderApp();
     }
 
@@ -1089,7 +994,7 @@
       document.body.appendChild(tempContainer);
       const opt = {
         margin: [5, 5, 5, 5],
-        filename: `PM_Weekly_Report_${(curProj.fixture || 'Project').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`,
+        filename: `PM_Weekly_Report_${(curProj.fixture || 'Project').replace(/\\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0, windowWidth: 1100 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
