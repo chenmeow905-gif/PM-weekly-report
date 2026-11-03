@@ -3,10 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PM weekly report 專案管理系統 (自訂色彩與高亮醒目版)</title>
-  <!-- Tailwind CSS CDN -->
+  <title>PM weekly report 專案管理系統</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- html2pdf.js for Client-Side PDF Generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     @media print {
@@ -16,40 +14,21 @@
       .print-table th, .print-table td { border: 1px solid #cbd5e1 !important; padding: 4px 6px !important; }
     }
     .html2pdf__page-break { page-break-before: always; }
-    
-    /* 觸控平滑捲動與滾動條 */
-    .touch-scroll {
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: thin;
-    }
+    .touch-scroll { -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
     ::-webkit-scrollbar { height: 6px; width: 6px; }
     ::-webkit-scrollbar-track { background: #f1f5f9; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
-    /* 凍結窗格：行動裝置橫向滾動時固定「專案」欄位 */
     @media (max-width: 1024px) {
-      .sticky-col-1 {
-        position: sticky;
-        left: 0;
-        z-index: 10;
-        background-color: #f8fafc;
-        box-shadow: 2px 0 4px -1px rgba(0,0,0,0.06);
-      }
-      .sticky-col-header {
-        position: sticky;
-        left: 0;
-        z-index: 30;
-        background-color: #e2e8f0;
-        box-shadow: 2px 0 4px -1px rgba(0,0,0,0.08);
-      }
+      .sticky-col-1 { position: sticky; left: 0; z-index: 10; background-color: #f8fafc; box-shadow: 2px 0 4px -1px rgba(0,0,0,0.06); }
+      .sticky-col-header { position: sticky; left: 0; z-index: 30; background-color: #e2e8f0; box-shadow: 2px 0 4px -1px rgba(0,0,0,0.08); }
     }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen antialiased">
   <div id="app" class="w-full flex flex-col p-2 sm:p-4 md:p-6 max-w-[1700px] mx-auto gap-4 sm:gap-6"></div>
 
-  <!-- 浮動文字顏色與醒目標示調色盤 (Floating Color & Highlight Palette) -->
+  <!-- 浮動調色盤 -->
   <div id="cellColorPalette" class="hidden fixed z-50 bg-white border border-slate-300 rounded-xl shadow-2xl p-3 w-72 text-xs transition-all">
     <div class="flex items-center justify-between border-b border-slate-200 pb-2 mb-2.5">
       <div class="font-bold text-slate-800 flex items-center gap-1.5">
@@ -57,43 +36,34 @@
       </div>
       <button onclick="closeColorPalette()" class="text-slate-400 hover:text-slate-700 font-bold px-1 text-sm">✕</button>
     </div>
-
-    <!-- 常用醒目色預設集 (快捷一鍵切換) -->
     <div class="mb-3">
       <div class="text-[11px] font-semibold text-slate-500 mb-1.5">快速醒目預設 (底色 + 字色)：</div>
       <div class="grid grid-cols-3 gap-1.5 text-center">
-        <button onclick="applyPresetColor('#dbeafe', '#1e40af')" class="p-1 rounded bg-blue-100 text-blue-800 font-bold border border-blue-200 hover:opacity-90">藍色 (需求/DFM)</button>
-        <button onclick="applyPresetColor('#fef3c7', '#92400e')" class="p-1 rounded bg-amber-100 text-amber-800 font-bold border border-amber-200 hover:opacity-90">黃色 (採購/備料)</button>
-        <button onclick="applyPresetColor('#ffedd5', '#9a3412')" class="p-1 rounded bg-orange-100 text-orange-800 font-bold border border-orange-200 hover:opacity-90">橙色 (組裝/調適)</button>
-        <button onclick="applyPresetColor('#d1fae5', '#065f46')" class="p-1 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-200 hover:opacity-90">綠色 (完成/Pass)</button>
-        <button onclick="applyPresetColor('#ffe4e6', '#9f1239')" class="p-1 rounded bg-rose-100 text-rose-800 font-bold border border-rose-200 hover:opacity-90">紅色 (延遲/異常)</button>
-        <button onclick="applyPresetColor('#f3e8ff', '#6b21a8')" class="p-1 rounded bg-purple-100 text-purple-800 font-bold border border-purple-200 hover:opacity-90">紫色 (KO/BOM)</button>
+        <button onclick="applyPresetColor('#dbeafe', '#1e40af')" class="p-1 rounded bg-blue-100 text-blue-800 font-bold border border-blue-200">藍色 (需求/DFM)</button>
+        <button onclick="applyPresetColor('#fef3c7', '#92400e')" class="p-1 rounded bg-amber-100 text-amber-800 font-bold border border-amber-200">黃色 (採購/備料)</button>
+        <button onclick="applyPresetColor('#ffedd5', '#9a3412')" class="p-1 rounded bg-orange-100 text-orange-800 font-bold border border-orange-200">橙色 (組裝/調適)</button>
+        <button onclick="applyPresetColor('#d1fae5', '#065f46')" class="p-1 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">綠色 (完成/Pass)</button>
+        <button onclick="applyPresetColor('#ffe4e6', '#9f1239')" class="p-1 rounded bg-rose-100 text-rose-800 font-bold border border-rose-200">紅色 (延遲/異常)</button>
+        <button onclick="applyPresetColor('#f3e8ff', '#6b21a8')" class="p-1 rounded bg-purple-100 text-purple-800 font-bold border border-purple-200">紫色 (KO/BOM)</button>
       </div>
     </div>
-
-    <!-- 自訂細部微調 (Picker) -->
     <div class="space-y-2 border-t border-slate-200 pt-2.5">
       <div class="flex items-center justify-between">
-        <span class="text-slate-600 font-medium">自訂醒目底色 (Highlight):</span>
+        <span class="text-slate-600 font-medium">自訂醒目底色:</span>
         <input type="color" id="pickerBg" onchange="applyCustomBg(this.value)" class="w-8 h-6 rounded cursor-pointer border border-slate-300" />
       </div>
       <div class="flex items-center justify-between">
-        <span class="text-slate-600 font-medium">自訂文字顏色 (Text Color):</span>
+        <span class="text-slate-600 font-medium">自訂文字顏色:</span>
         <input type="color" id="pickerText" onchange="applyCustomText(this.value)" class="w-8 h-6 rounded cursor-pointer border border-slate-300" />
       </div>
     </div>
-
     <div class="border-t border-slate-200 pt-2.5 mt-2.5 flex items-center justify-between">
-      <button onclick="clearCustomColor()" class="text-rose-600 hover:text-rose-800 font-medium text-[11px] flex items-center gap-1">
-        <span>🔄</span><span>清除顏色 (恢復預設)</span>
-      </button>
-      <button onclick="closeColorPalette()" class="bg-teal-700 hover:bg-teal-800 text-white font-medium px-2.5 py-1 rounded text-xs shadow-sm">
-        完成
-      </button>
+      <button onclick="clearCustomColor()" class="text-rose-600 hover:text-rose-800 font-medium text-[11px]">🔄 清除顏色 (預設)</button>
+      <button onclick="closeColorPalette()" class="bg-teal-700 hover:bg-teal-800 text-white font-medium px-2.5 py-1 rounded text-xs">完成</button>
     </div>
   </div>
 
-  <!-- 列印與 PDF 匯出預覽彈窗 -->
+  <!-- 列印預覽彈窗 -->
   <div id="printModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
     <div class="bg-white rounded-xl sm:rounded-2xl shadow-2xl max-w-5xl w-full max-h-[94vh] flex flex-col overflow-hidden">
       <div class="p-3 sm:p-4 bg-teal-800 text-white flex flex-wrap items-center justify-between gap-2">
@@ -102,15 +72,9 @@
           <span class="text-[10px] sm:text-xs bg-teal-900 px-2 py-0.5 rounded text-teal-200">A4 橫向重點摘要版</span>
         </div>
         <div class="flex items-center gap-1.5 sm:gap-2">
-          <button onclick="executeModalPrint()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 sm:px-3 py-1.5 rounded-lg font-bold shadow transition flex items-center gap-1">
-            <span>🖨️</span><span class="hidden sm:inline">瀏覽器列印 / </span><span>另存PDF</span>
-          </button>
-          <button onclick="downloadReportFromModal()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs px-2.5 sm:px-3 py-1.5 rounded-lg font-bold shadow transition flex items-center gap-1">
-            <span>⬇️</span><span>下載 PDF</span>
-          </button>
-          <button onclick="closePrintModal()" class="text-white/80 hover:text-white text-base sm:text-lg font-bold px-2 py-0.5">
-            ✕
-          </button>
+          <button onclick="executeModalPrint()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 sm:px-3 py-1.5 rounded-lg font-bold shadow">🖨️ 列印 / 另存PDF</button>
+          <button onclick="downloadReportFromModal()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs px-2.5 sm:px-3 py-1.5 rounded-lg font-bold shadow">⬇️ 下載 PDF</button>
+          <button onclick="closePrintModal()" class="text-white/80 hover:text-white text-base sm:text-lg font-bold px-2 py-0.5">✕</button>
         </div>
       </div>
       <div class="p-2 sm:p-4 overflow-y-auto flex-1 bg-slate-200/70 touch-scroll" id="modalPreviewBody"></div>
@@ -223,13 +187,13 @@
     let projects = INITIAL_PROJECTS;
 
     try {
-      const storedWeeks = localStorage.getItem('PM_SYSTEM_WEEKS_V13');
+      const storedWeeks = localStorage.getItem('PM_SYSTEM_WEEKS_V14');
       if (storedWeeks) weeks = JSON.parse(storedWeeks);
-      const storedProjects = localStorage.getItem('PM_SYSTEM_PROJECTS_V13');
+      const storedProjects = localStorage.getItem('PM_SYSTEM_PROJECTS_V14');
       if (storedProjects) {
         projects = JSON.parse(storedProjects);
       } else {
-        localStorage.setItem('PM_SYSTEM_PROJECTS_V13', JSON.stringify(INITIAL_PROJECTS));
+        localStorage.setItem('PM_SYSTEM_PROJECTS_V14', JSON.stringify(INITIAL_PROJECTS));
       }
     } catch (e) {}
 
@@ -237,12 +201,11 @@
 
     function saveState() {
       try {
-        localStorage.setItem('PM_SYSTEM_WEEKS_V13', JSON.stringify(weeks));
-        localStorage.setItem('PM_SYSTEM_PROJECTS_V13', JSON.stringify(projects));
+        localStorage.setItem('PM_SYSTEM_WEEKS_V14', JSON.stringify(weeks));
+        localStorage.setItem('PM_SYSTEM_PROJECTS_V14', JSON.stringify(projects));
       } catch (e) {}
     }
 
-    // 調色盤控制邏輯
     let activePaletteTarget = null;
 
     function openColorPalette(projId, weekId, btnEl) {
@@ -261,8 +224,7 @@
       palette.classList.remove('hidden');
 
       const rect = btnEl.getBoundingClientRect();
-      const paletteWidth = 288;
-      let left = rect.left + window.scrollX - paletteWidth + 28;
+      let left = rect.left + window.scrollX - 260;
       if (left < 10) left = 10;
       let top = rect.bottom + window.scrollY + 6;
       if (top + 280 > window.innerHeight + window.scrollY) {
@@ -308,16 +270,13 @@
 
       projects = projects.map(p => {
         if (p.id !== projId) return p;
-        return {
-          ...p,
-          milestones: { ...(p.milestones || {}), [weekId]: textVal }
-        };
+        return { ...p, milestones: { ...(p.milestones || {}), [weekId]: textVal } };
       });
       saveState();
 
       inputEl.style.backgroundColor = '';
       inputEl.style.color = '';
-      inputEl.className = "w-full text-center text-[10px] leading-tight py-1 focus:bg-white rounded font-medium";
+      inputEl.className = "w-full text-center text-[10px] leading-tight py-1 pr-3 focus:bg-white rounded font-medium";
       liveColorBadge(inputEl);
       closeColorPalette();
     }
@@ -328,15 +287,12 @@
         if (p.id !== projId) return p;
         return {
           ...p,
-          milestones: {
-            ...(p.milestones || {}),
-            [weekId]: { text: val, bg: bg, color: color }
-          }
+          milestones: { ...(p.milestones || {}), [weekId]: { text: val, bg: bg, color: color } }
         };
       });
       saveState();
 
-      inputEl.className = "w-full text-center text-[10px] leading-tight py-1 rounded font-bold";
+      inputEl.className = "w-full text-center text-[10px] leading-tight py-1 pr-3 rounded font-bold";
       inputEl.style.backgroundColor = bg;
       inputEl.style.color = color;
     }
@@ -380,7 +336,7 @@
                 <span>PM weekly report 專案管理系統</span>
                 <span class="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 font-medium">色彩醒目自訂版</span>
               </h1>
-              <p class="text-[11px] sm:text-xs text-slate-500">點選週次欄右側調色盤 🎨 即可自由設定文字色彩與高亮醒目標籤</p>
+              <p class="text-[11px] sm:text-xs text-slate-500">已同步 Vera Rubin NapaD BFT 治具與排程，點選 🎨 可自訂文字與標籤顏色</p>
             </div>
           </div>
 
@@ -524,11 +480,17 @@
           </div>
         </section>
 
+        <!-- 模組二：標準單頁週報卡片 -->
         <section id="section-detail" class="${viewMode === 'master' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border-2 border-teal-800 overflow-hidden">
           <div class="bg-teal-800 text-white p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
               <span class="bg-white/20 text-white text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded flex-shrink-0">Weekly Report</span>
-              <input type="text" value="NPI Project (${curProj.fixture || '治具名稱'}) - ${curProj.phase || '階段'}" onblur="commitFixtureTitle('${curProj.id}', this.value)" class="bg-transparent font-bold text-base sm:text-lg text-white border-b border-transparent hover:border-white/50 focus:border-white focus:outline-none flex-1 min-w-[200px]" />
+              <input
+                type="text"
+                value="NPI Project (${curProj.fixture || '治具名稱'}) - ${curProj.phase || '階段'}"
+                onblur="commitFixtureTitle('${curProj.id}', this.value)"
+                class="bg-transparent font-bold text-base sm:text-lg text-white border-b border-transparent hover:border-white/50 focus:border-white focus:outline-none flex-1 min-w-[200px]"
+              />
             </div>
 
             <div class="no-print flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
@@ -754,8 +716,8 @@
 
     function resetToInitialData() {
       try {
-        localStorage.removeItem('PM_SYSTEM_PROJECTS_V13');
-        localStorage.removeItem('PM_SYSTEM_WEEKS_V13');
+        localStorage.removeItem('PM_SYSTEM_PROJECTS_V14');
+        localStorage.removeItem('PM_SYSTEM_WEEKS_V14');
       } catch (e) {}
       weeks = DEFAULT_WEEKS;
       projects = JSON.parse(JSON.stringify(INITIAL_PROJECTS));
@@ -814,14 +776,10 @@
     }
 
     function deleteLog(projId, logId) {
-      projects = projects.map(p => {
-        if (p.id !== projId) return p;
-        return { ...p, progress_logs: (p.progress_logs || []).filter(l => l.id !== logId) };
-      });
+      projects = projects.map(p => p.id === projId ? { ...p, progress_logs: (p.progress_logs || []).filter(l => l.id !== logId) } : p);
       renderApp();
     }
 
-    // 正式報告生成 (完整同步自訂底色與字色至 PDF)
     function generateCleanReportHTML() {
       const curProj = projects.find(p => p.id === selectedId) || projects[0];
       return `
@@ -994,7 +952,7 @@
       document.body.appendChild(tempContainer);
       const opt = {
         margin: [5, 5, 5, 5],
-        filename: `PM_Weekly_Report_${(curProj.fixture || 'Project').replace(/\\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`,
+        filename: `PM_Weekly_Report_${(curProj.fixture || 'Project').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0, windowWidth: 1100 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
@@ -1021,21 +979,3 @@
             @page { size: A4 landscape; margin: 8mm; }
             body { margin: 0; padding: 0; background: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
           </style>
-        </head>
-        <body>
-          ${reportHtml}
-          <script>
-            window.onload = function() {
-              setTimeout(function() { window.print(); }, 300);
-            };
-          <\/script>
-        </body>
-        </html>
-      `);
-      printWindow.document.close();
-    }
-
-    renderApp();
-  </script>
-</body>
-</html>
