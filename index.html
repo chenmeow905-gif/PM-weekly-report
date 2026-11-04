@@ -37,4 +37,172 @@
       .sticky-col-header {
         position: sticky;
         left: 0;
-        z-index:
+        z-index: 30;
+        background-color: #e2e8f0;
+        box-shadow: 2px 0 4px -1px rgba(0,0,0,0.08);
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen antialiased">
+
+  <!-- 1. 獨立純 CSS 登入遮罩（層級 99999，確保絕對不會被遮擋或空白） -->
+  <div id="loginOverlay" style="position: fixed; inset: 0; z-index: 99999; display: flex; align-items: center; justify-content: center; background-color: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); padding: 16px;">
+    <div style="background: #ffffff; width: 100%; max-width: 420px; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4); border: 1px solid #e2e8f0; overflow: hidden;">
+      <div style="background-color: #0f766e; padding: 24px; text-align: center; color: white;">
+        <div style="width: 52px; height: 52px; background: rgba(255,255,255,0.15); border-radius: 12px; margin: 0 auto 12px auto; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 900;">
+          PM
+        </div>
+        <h2 style="font-size: 19px; font-weight: bold; margin: 0; letter-spacing: -0.5px;">PM 專案管理系統</h2>
+        <p style="font-size: 11.5px; color: #ccfbf1; margin: 4px 0 0 0;">請驗證身分以存取專案時程與日報資料</p>
+      </div>
+      <form id="loginForm" onsubmit="handleLoginSubmit(event)" style="padding: 24px;">
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 12px; font-weight: bold; color: #334155; margin-bottom: 6px;">使用者姓名</label>
+          <input 
+            type="text" 
+            id="loginUsername" 
+            placeholder="請輸入姓名 (例如: Jane)" 
+            value="Jane"
+            required 
+            style="width: 100%; font-size: 13.5px; padding: 10px 12px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; outline: none;"
+          />
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 12px; font-weight: bold; color: #334155; margin-bottom: 6px;">通關密碼</label>
+          <input 
+            type="password" 
+            id="loginPassword" 
+            placeholder="請輸入密碼 (預設: adsbu1)" 
+            required 
+            style="width: 100%; font-size: 13.5px; padding: 10px 12px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; outline: none;"
+          />
+        </div>
+        <div id="loginErrorMsg" style="display: none; font-size: 12px; font-weight: 600; color: #e11d48; background: #ffe4e6; padding: 8px 12px; border-radius: 6px; margin-bottom: 14px; text-align: center;"></div>
+        <button 
+          type="submit" 
+          style="width: 100%; background-color: #0f766e; color: white; font-weight: bold; font-size: 14px; padding: 12px; border-radius: 8px; border: none; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); transition: background 0.2s;"
+        >
+          🔐 登入系統
+        </button>
+      </form>
+      <div style="background: #f8fafc; padding: 10px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #64748b;">
+        內部專案控管系統 • 機密資料請勿外傳
+      </div>
+    </div>
+  </div>
+
+  <!-- 主系統容器 -->
+  <div id="app" class="w-full flex flex-col p-2 sm:p-4 md:p-6 max-w-[1700px] mx-auto gap-4 sm:gap-6"></div>
+
+  <!-- 浮動調色盤 -->
+  <div id="cellColorPalette" class="hidden fixed z-50 bg-white border border-slate-300 rounded-xl shadow-2xl p-3 w-72 text-xs transition-all">
+    <div class="flex items-center justify-between border-b border-slate-200 pb-2 mb-2.5">
+      <div class="font-bold text-slate-800 flex items-center gap-1.5">
+        <span>🎨</span><span>設定醒目標示與文字顏色</span>
+      </div>
+      <button onclick="closeColorPalette()" class="text-slate-400 hover:text-slate-700 font-bold px-1 text-sm">✕</button>
+    </div>
+    <div class="mb-3">
+      <div class="text-[11px] font-semibold text-slate-500 mb-1.5">快速醒目預設 (底色 + 字色)：</div>
+      <div class="grid grid-cols-3 gap-1.5 text-center">
+        <button onclick="applyPresetColor('#dbeafe', '#1e40af')" class="p-1 rounded bg-blue-100 text-blue-800 font-bold border border-blue-200">藍色 (需求/DFM)</button>
+        <button onclick="applyPresetColor('#fef3c7', '#92400e')" class="p-1 rounded bg-amber-100 text-amber-800 font-bold border border-amber-200">黃色 (採購/備料)</button>
+        <button onclick="applyPresetColor('#ffedd5', '#9a3412')" class="p-1 rounded bg-orange-100 text-orange-800 font-bold border border-orange-200">橙色 (組裝/調適)</button>
+        <button onclick="applyPresetColor('#d1fae5', '#065f46')" class="p-1 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">綠色 (完成/Pass)</button>
+        <button onclick="applyPresetColor('#ffe4e6', '#9f1239')" class="p-1 rounded bg-rose-100 text-rose-800 font-bold border border-rose-200">紅色 (延遲/異常)</button>
+        <button onclick="applyPresetColor('#f3e8ff', '#6b21a8')" class="p-1 rounded bg-purple-100 text-purple-800 font-bold border border-purple-200">紫色 (KO/BOM)</button>
+      </div>
+    </div>
+    <div class="space-y-2 border-t border-slate-200 pt-2.5">
+      <div class="flex items-center justify-between">
+        <span class="text-slate-600 font-medium">自訂醒目底色:</span>
+        <input type="color" id="pickerBg" onchange="applyCustomBg(this.value)" class="w-8 h-6 rounded cursor-pointer border border-slate-300" />
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-slate-600 font-medium">自訂文字顏色:</span>
+        <input type="color" id="pickerText" onchange="applyCustomText(this.value)" class="w-8 h-6 rounded cursor-pointer border border-slate-300" />
+      </div>
+    </div>
+    <div class="border-t border-slate-200 pt-2.5 mt-2.5 flex items-center justify-between">
+      <button onclick="clearCustomColor()" class="text-rose-600 hover:text-rose-800 font-medium text-[11px]">🔄 清除顏色 (預設)</button>
+      <button onclick="closeColorPalette()" class="bg-teal-700 hover:bg-teal-800 text-white font-medium px-2.5 py-1 rounded text-xs">完成</button>
+    </div>
+  </div>
+
+  <!-- 週報列印預覽彈窗 -->
+  <div id="printModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div class="bg-white rounded-xl sm:rounded-2xl shadow-2xl max-w-5xl w-full max-h-[94vh] flex flex-col overflow-hidden">
+      <div class="p-3 sm:p-4 bg-teal-800 text-white flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-sm sm:text-base md:text-lg">正式報告列印與 PDF 匯出預覽</span>
+          <span class="text-[10px] sm:text-xs bg-teal-900 px-2 py-0.5 rounded text-teal-200" id="printModalTeamTag">A4 橫向重點摘要版</span>
+        </div>
+        <div class="flex items-center gap-1.5 sm:gap-2">
+          <button onclick="executeModalPrint()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 sm:px-3 py-1.5 rounded-lg font-bold shadow">🖨️ 列印 / 另存PDF</button>
+          <button onclick="downloadReportFromModal()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs px-2.5 sm:px-3 py-1.5 rounded-lg font-bold shadow">⬇️ 下載 PDF</button>
+          <button onclick="closePrintModal()" class="text-white/80 hover:text-white text-base sm:text-lg font-bold px-2 py-0.5">✕</button>
+        </div>
+      </div>
+      <div class="p-2 sm:p-4 overflow-y-auto flex-1 bg-slate-200/70 touch-scroll" id="modalPreviewBody"></div>
+    </div>
+  </div>
+
+  <script>
+    // 登入驗證身分控制 (通關密碼: adsbu1)
+    const AUTH_KEY = 'PM_AUTH_USER_SESSION_2026';
+    const CORRECT_PASS = 'adsbu1';
+
+    function getLoggedInUser() {
+      return sessionStorage.getItem(AUTH_KEY) || '';
+    }
+
+    function checkAuth() {
+      const user = getLoggedInUser();
+      const overlay = document.getElementById('loginOverlay');
+      if (!user) {
+        if (overlay) overlay.style.display = 'flex';
+        return false;
+      } else {
+        if (overlay) overlay.style.display = 'none';
+        return true;
+      }
+    }
+
+    function handleLoginSubmit(e) {
+      e.preventDefault();
+      const userVal = document.getElementById('loginUsername').value.trim();
+      const passVal = document.getElementById('loginPassword').value.trim();
+      const errEl = document.getElementById('loginErrorMsg');
+
+      if (!userVal) {
+        errEl.innerText = '請輸入使用者姓名！';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      if (passVal !== CORRECT_PASS) {
+        errEl.innerText = '通關密碼錯誤，請重新輸入！';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      errEl.style.display = 'none';
+      sessionStorage.setItem(AUTH_KEY, userVal);
+      checkAuth();
+      renderApp();
+    }
+
+    function handleLogout() {
+      if (confirm('確定要登出系統嗎？')) {
+        sessionStorage.removeItem(AUTH_KEY);
+        location.reload();
+      }
+    }
+
+    // 組別參數隔離 (URL Parameter: ?team=xxx 或 ?group=xxx)，預設組別為 Jane
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentTeam = urlParams.get('team') || urlParams.get('group') || 'Jane';
+    currentTeam = currentTeam.replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, '').trim() || 'Jane';
+
+    // 100% 完整載入您最新備份檔 PM_System_Backup_2026-11-04_2.
