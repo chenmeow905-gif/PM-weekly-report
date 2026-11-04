@@ -7,7 +7,7 @@
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* 原生 A4 橫向列印樣式：100% 不依賴任何外部 PDF 套件 */
+    /* 原生 A4 橫向列印樣式：100% 不依賴任何外部套件 */
     @page {
       size: A4 landscape;
       margin: 8mm 6mm;
@@ -79,7 +79,7 @@
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen antialiased">
 
-  <!-- 1. 獨立純 CSS 登入遮罩（層級 99999） -->
+  <!-- 1. 獨立純 CSS 登入遮罩 -->
   <div id="loginOverlay" style="position: fixed; inset: 0; z-index: 99999; display: flex; align-items: center; justify-content: center; background-color: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); padding: 16px; pointer-events: auto;">
     <div style="background: #ffffff; width: 100%; max-width: 420px; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4); border: 1px solid #e2e8f0; overflow: hidden; pointer-events: auto;">
       <div style="background-color: #0f766e; padding: 24px; text-align: center; color: white;">
@@ -211,6 +211,7 @@
       errEl.style.display = 'none';
       sessionStorage.setItem(AUTH_KEY, userVal);
       checkAuth();
+      initDataForCurrentTeam();
       renderApp();
     }
 
@@ -394,11 +395,13 @@
     let dailyReports = [];
     let dailyReportDate = '2026-11-04';
     let weeklyReportDate = '2026-11-04';
+    let selectedId = '';
 
     function initDataForCurrentTeam() {
       if (!currentTeam) {
         projects = [];
         dailyReports = [];
+        selectedId = '';
         return;
       }
 
@@ -437,10 +440,8 @@
       } catch (e) {
         console.warn('LocalStorage load error:', e);
       }
+      selectedId = (projects && projects[0]) ? projects[0].id : '';
     }
-
-    initDataForCurrentTeam();
-    let selectedId = projects[0] ? projects[0].id : '';
 
     function saveState() {
       if (!currentTeam) return;
@@ -571,7 +572,7 @@
     }
 
     function getMonthGroups() {
-      if (weeks.length === 0) return [];
+      if (!weeks || weeks.length === 0) return [];
       const groups = [];
       let curMonth = weeks[0].month || 'Month';
       let span = 0;
@@ -677,7 +678,7 @@
       const savedScrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0;
 
       saveState();
-      const curProj = projects.find(p => p.id === selectedId) || projects[0] || {};
+      const curProj = (projects && projects.length > 0) ? (projects.find(p => p.id === selectedId) || projects[0]) : {};
       const monthGroups = getMonthGroups();
 
       const app = document.getElementById('app');
@@ -878,7 +879,7 @@
               <div class="flex items-center gap-2 flex-wrap">
                 <div class="w-2.5 h-4 sm:h-5 bg-teal-600 rounded"></div>
                 <h2 class="text-sm sm:text-base font-bold text-slate-800 tracking-tight">PM weekly report (${currentTeam})</h2>
-                <span class="text-[11px] sm:text-xs text-slate-400">（共 ${projects.length} 項治具）</span>
+                <span class="text-[11px] sm:text-xs text-slate-400">（共 ${projects ? projects.length : 0} 項治具）</span>
                 <div class="flex items-center gap-1 text-xs bg-white border border-slate-300 px-2 py-0.5 rounded-md shadow-sm ml-2">
                   <span class="text-slate-500 font-medium">📅 週報日期:</span>
                   <input 
@@ -1035,7 +1036,7 @@
                 <div class="flex items-center gap-1.5 flex-1 sm:flex-initial">
                   <span class="text-xs text-teal-200 hidden md:inline">切換治具：</span>
                   <select onchange="selectProject(this.value)" class="bg-teal-900 text-white text-xs px-2 py-1.5 rounded border border-teal-700 focus:outline-none w-full sm:w-auto">
-                    ${projects.map(p => `<option value="${p.id}" ${p.id === curProj.id ? 'selected' : ''}>${p.fixture || '未命名治具'} (${p.phase || 'N/A'})</option>`).join('')}
+                    ${(projects || []).map(p => `<option value="${p.id}" ${p.id === curProj.id ? 'selected' : ''}>${p.fixture || '未命名治具'} (${p.phase || 'N/A'})</option>`).join('')}
                   </select>
                 </div>
                 <button type="button" onclick="deleteProject('${curProj.id}')" class="text-xs bg-rose-600 hover:bg-rose-700 text-white px-2.5 py-1.5 rounded transition flex-shrink-0">刪除</button>
@@ -1385,6 +1386,7 @@
 
     // 啟動身分檢查與頁面渲染
     if (checkAuth()) {
+      initDataForCurrentTeam();
       renderApp();
     }
   </script>
