@@ -45,6 +45,51 @@
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen antialiased">
+  <!-- 登入驗證遮罩與彈窗 -->
+  <div id="loginOverlay" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all">
+      <div class="bg-teal-800 p-6 text-white text-center">
+        <div class="w-14 h-14 bg-white/10 rounded-2xl mx-auto flex items-center justify-center text-2xl font-black mb-3 shadow-inner">
+          PM
+        </div>
+        <h2 class="text-xl font-bold tracking-tight">PM 專案管理系統</h2>
+        <p class="text-xs text-teal-200 mt-1">請驗證身分以存取專案時程與日報資料</p>
+      </div>
+      <form id="loginForm" onsubmit="handleLoginSubmit(event)" class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1.5">使用者姓名</label>
+          <input 
+            type="text" 
+            id="loginUsername" 
+            placeholder="請輸入您的姓名 (例如: Jane)" 
+            required 
+            class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent transition"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1.5">通關密碼</label>
+          <input 
+            type="password" 
+            id="loginPassword" 
+            placeholder="請輸入密碼" 
+            required 
+            class="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent transition"
+          />
+        </div>
+        <div id="loginErrorMsg" class="hidden text-xs font-semibold text-rose-600 bg-rose-50 p-2.5 rounded-lg border border-rose-200 text-center"></div>
+        <button 
+          type="submit" 
+          class="w-full bg-teal-700 hover:bg-teal-800 text-white font-bold text-sm py-2.5 rounded-lg shadow-md hover:shadow-lg transition flex items-center justify-center gap-1.5"
+        >
+          <span>🔐</span><span>登入系統</span>
+        </button>
+      </form>
+      <div class="bg-slate-50 px-6 py-3 border-t border-slate-200 text-center text-[11px] text-slate-500">
+        內部專案控管系統 • 機密資料請勿外傳
+      </div>
+    </div>
+  </div>
+
   <div id="app" class="w-full flex flex-col p-2 sm:p-4 md:p-6 max-w-[1700px] mx-auto gap-4 sm:gap-6"></div>
 
   <!-- 浮動調色盤 -->
@@ -88,7 +133,7 @@
       <div class="p-3 sm:p-4 bg-teal-800 text-white flex flex-wrap items-center justify-between gap-2">
         <div class="flex items-center gap-2">
           <span class="font-bold text-sm sm:text-base md:text-lg">正式報告列印與 PDF 匯出預覽</span>
-          <span class="text-[10px] sm:text-xs bg-teal-900 px-2 py-0.5 rounded text-teal-200">A4 橫向重點摘要版</span>
+          <span class="text-[10px] sm:text-xs bg-teal-900 px-2 py-0.5 rounded text-teal-200" id="printModalTeamTag">A4 橫向重點摘要版</span>
         </div>
         <div class="flex items-center gap-1.5 sm:gap-2">
           <button onclick="executeModalPrint()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 sm:px-3 py-1.5 rounded-lg font-bold shadow">🖨️ 列印 / 另存PDF</button>
@@ -101,6 +146,65 @@
   </div>
 
   <script>
+    // 1. 組別參數隔離 (URL Parameter: ?team=xxx 或 ?group=xxx)，預設組別改為 Jane
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentTeam = urlParams.get('team') || urlParams.get('group') || 'Jane';
+    // 登入驗證邏輯 (通關密碼: adsbu1)
+    const AUTH_KEY = 'PM_AUTH_USER_SESSION';
+    const CORRECT_PASS = 'adsbu1';
+
+    function getLoggedInUser() {
+      return sessionStorage.getItem(AUTH_KEY) || localStorage.getItem(AUTH_KEY) || '';
+    }
+
+    function checkAuth() {
+      const user = getLoggedInUser();
+      const overlay = document.getElementById('loginOverlay');
+      if (!overlay) return true;
+      if (!user) {
+        overlay.classList.remove('hidden');
+        return false;
+      } else {
+        overlay.classList.add('hidden');
+        return true;
+      }
+    }
+
+    function handleLoginSubmit(e) {
+      e.preventDefault();
+      const userVal = document.getElementById('loginUsername').value.trim();
+      const passVal = document.getElementById('loginPassword').value.trim();
+      const errEl = document.getElementById('loginErrorMsg');
+
+      if (!userVal) {
+        errEl.innerText = '請輸入姓名！';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      if (passVal !== CORRECT_PASS) {
+        errEl.innerText = '密碼錯誤，請重新輸入！';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      errEl.classList.add('hidden');
+      sessionStorage.setItem(AUTH_KEY, userVal);
+      localStorage.setItem(AUTH_KEY, userVal); // 記住登入狀態，同瀏覽器不需重複登入
+      checkAuth();
+      renderApp();
+    }
+
+    function handleLogout() {
+      if (confirm('確定要登出系統嗎？')) {
+        sessionStorage.removeItem(AUTH_KEY);
+        localStorage.removeItem(AUTH_KEY);
+        location.reload();
+      }
+    }
+
+    currentTeam = currentTeam.replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, '').trim() || 'Jane';
+
     const DEFAULT_WEEKS = [
       { id: 'w1', week: 'WK32', month: 'Aug-26', date: '8/3' },
       { id: 'w2', week: 'WK33', month: 'Aug-26', date: '8/10' },
@@ -284,82 +388,73 @@
     let dailyReports = INITIAL_DAILY_REPORT;
     let dailyReportDate = '2026-11-03';
 
-    // 智能歷史快取溯源機制：自動搜尋您過去編輯的所有鍵名
+    // 2. 組別專屬 LocalStorage 鍵名綁定 (Jane 專屬)
+    const STORAGE_KEY_PROJ = `PM_SYSTEM_ACTIVE_PROJECTS_${currentTeam}`;
+    const STORAGE_KEY_WEEK = `PM_SYSTEM_ACTIVE_WEEKS_${currentTeam}`;
+    const STORAGE_KEY_DAILY = `PM_SYSTEM_ACTIVE_DAILY_${currentTeam}`;
+    const STORAGE_KEY_DATE = `PM_SYSTEM_ACTIVE_DATE_${currentTeam}`;
+
+    // 智能資料載入 (若當前組別無資料，Jane 自動溯源繼承 Team A 或先前的歷史資料)
     try {
-      const projKeys = [
-        'PM_SYSTEM_ACTIVE_PROJECTS', 'PM_SYSTEM_PROJECTS_V19', 'PM_SYSTEM_PROJECTS_V18', 
-        'PM_SYSTEM_PROJECTS_V17', 'PM_SYSTEM_PROJECTS_V16', 'PM_SYSTEM_PROJECTS_V15', 
-        'PM_SYSTEM_PROJECTS_V14', 'PM_SYSTEM_PROJECTS_V13', 'PM_SYSTEM_PROJECTS_V12', 
-        'PM_SYSTEM_PROJECTS_V11', 'PM_SYSTEM_PROJECTS_V10', 'PM_SYSTEM_PROJECTS_V9', 
-        'PM_SYSTEM_PROJECTS_V8', 'PM_SYSTEM_PROJECTS_FINAL', 'PM_SYSTEM_PROJECTS'
-      ];
-      for (const k of projKeys) {
-        const item = localStorage.getItem(k);
-        if (item) {
-          try {
-            const parsed = JSON.parse(item);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              projects = parsed;
-              break;
-            }
-          } catch(err) {}
+      const storedProj = localStorage.getItem(STORAGE_KEY_PROJ);
+      if (storedProj) {
+        projects = JSON.parse(storedProj);
+      } else if (currentTeam === 'Jane' || currentTeam === 'A' || currentTeam === 'default') {
+        const histKeys = [
+          'PM_SYSTEM_ACTIVE_PROJECTS_Jane', 'PM_SYSTEM_ACTIVE_PROJECTS_A',
+          'PM_SYSTEM_ACTIVE_PROJECTS', 'PM_SYSTEM_PROJECTS_V19', 'PM_SYSTEM_PROJECTS_V18', 
+          'PM_SYSTEM_PROJECTS_V17', 'PM_SYSTEM_PROJECTS_V16', 'PM_SYSTEM_PROJECTS_V15', 
+          'PM_SYSTEM_PROJECTS_FINAL', 'PM_SYSTEM_PROJECTS'
+        ];
+        for (const k of histKeys) {
+          const item = localStorage.getItem(k);
+          if (item) {
+            try {
+              const p = JSON.parse(item);
+              if (Array.isArray(p) && p.length > 0) { projects = p; break; }
+            } catch(e) {}
+          }
         }
       }
 
-      const weekKeys = [
-        'PM_SYSTEM_ACTIVE_WEEKS', 'PM_SYSTEM_WEEKS_V19', 'PM_SYSTEM_WEEKS_V18', 
-        'PM_SYSTEM_WEEKS_V17', 'PM_SYSTEM_WEEKS_V16', 'PM_SYSTEM_WEEKS_V15', 
-        'PM_SYSTEM_WEEKS_V14', 'PM_SYSTEM_WEEKS_V13', 'PM_SYSTEM_WEEKS_V12', 
-        'PM_SYSTEM_WEEKS_FINAL', 'PM_SYSTEM_WEEKS'
-      ];
-      for (const k of weekKeys) {
-        const item = localStorage.getItem(k);
-        if (item) {
-          try {
-            const parsed = JSON.parse(item);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              weeks = parsed;
-              break;
-            }
-          } catch(err) {}
+      const storedWeeks = localStorage.getItem(STORAGE_KEY_WEEK);
+      if (storedWeeks) {
+        weeks = JSON.parse(storedWeeks);
+      } else if (currentTeam === 'Jane' || currentTeam === 'A' || currentTeam === 'default') {
+        const histWk = ['PM_SYSTEM_ACTIVE_WEEKS_Jane', 'PM_SYSTEM_ACTIVE_WEEKS_A', 'PM_SYSTEM_ACTIVE_WEEKS', 'PM_SYSTEM_WEEKS_V19', 'PM_SYSTEM_WEEKS_V18', 'PM_SYSTEM_WEEKS_FINAL'];
+        for (const k of histWk) {
+          const item = localStorage.getItem(k);
+          if (item) {
+            try { const w = JSON.parse(item); if (Array.isArray(w) && w.length > 0) { weeks = w; break; } } catch(e) {}
+          }
         }
       }
 
-      const dailyKeys = [
-        'PM_SYSTEM_ACTIVE_DAILY', 'PM_SYSTEM_DAILY_V19', 'PM_SYSTEM_DAILY_V18', 
-        'PM_SYSTEM_DAILY_V17', 'PM_SYSTEM_DAILY_V1', 'PM_SYSTEM_DAILY'
-      ];
-      for (const k of dailyKeys) {
-        const item = localStorage.getItem(k);
-        if (item) {
-          try {
-            const parsed = JSON.parse(item);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              dailyReports = parsed;
-              break;
-            }
-          } catch(err) {}
+      const storedDaily = localStorage.getItem(STORAGE_KEY_DAILY);
+      if (storedDaily) {
+        dailyReports = JSON.parse(storedDaily);
+      } else if (currentTeam === 'Jane' || currentTeam === 'A' || currentTeam === 'default') {
+        const histD = ['PM_SYSTEM_ACTIVE_DAILY_Jane', 'PM_SYSTEM_ACTIVE_DAILY_A', 'PM_SYSTEM_ACTIVE_DAILY', 'PM_SYSTEM_DAILY_V19', 'PM_SYSTEM_DAILY_V18'];
+        for (const k of histD) {
+          const item = localStorage.getItem(k);
+          if (item) {
+            try { const d = JSON.parse(item); if (Array.isArray(d) && d.length > 0) { dailyReports = d; break; } } catch(e) {}
+          }
         }
       }
 
-      const dateKeys = ['PM_SYSTEM_ACTIVE_DATE', 'PM_SYSTEM_DAILY_DATE_V19', 'PM_SYSTEM_DAILY_DATE_V18', 'PM_SYSTEM_DAILY_DATE'];
-      for (const k of dateKeys) {
-        const item = localStorage.getItem(k);
-        if (item) {
-          dailyReportDate = item;
-          break;
-        }
+      const storedDate = localStorage.getItem(STORAGE_KEY_DATE);
+      if (storedDate) {
+        dailyReportDate = storedDate;
+      } else if (currentTeam === 'Jane' || currentTeam === 'A' || currentTeam === 'default') {
+        const d = localStorage.getItem('PM_SYSTEM_ACTIVE_DATE_A') || localStorage.getItem('PM_SYSTEM_ACTIVE_DATE');
+        if (d) dailyReportDate = d;
       }
     } catch (e) {
       console.warn('LocalStorage retrieval error:', e);
     }
 
     let selectedId = projects.find(p => p.project === 'NNV1') ? projects.find(p => p.project === 'NNV1').id : (projects[0] ? projects[0].id : '');
-
-    const STORAGE_KEY_PROJ = 'PM_SYSTEM_ACTIVE_PROJECTS';
-    const STORAGE_KEY_WEEK = 'PM_SYSTEM_ACTIVE_WEEKS';
-    const STORAGE_KEY_DAILY = 'PM_SYSTEM_ACTIVE_DAILY';
-    const STORAGE_KEY_DATE = 'PM_SYSTEM_ACTIVE_DATE';
 
     function saveState() {
       try {
@@ -368,6 +463,22 @@
         localStorage.setItem(STORAGE_KEY_DAILY, JSON.stringify(dailyReports));
         localStorage.setItem(STORAGE_KEY_DATE, dailyReportDate);
       } catch (e) {}
+    }
+
+    // 切換組別函式
+    function switchTeam(newTeam) {
+      if (!newTeam || newTeam === currentTeam) return;
+      saveState();
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('team', newTeam);
+      window.location.href = newUrl.toString();
+    }
+
+    function promptNewTeam() {
+      const input = prompt('請輸入新組別代號 (例如: B, C, NPI, Automation):', '');
+      if (input && input.trim()) {
+        switchTeam(input.trim());
+      }
     }
 
     // 調色盤邏輯
@@ -529,14 +640,14 @@
     }
 
     function resetDailyReport() {
-      if (confirm('確定要將 Daily Report 還原回預設範本嗎？')) {
+      if (confirm(`確定要將 [組別: ${currentTeam}] 的 Daily Report 還原回預設範本嗎？`)) {
         dailyReports = JSON.parse(JSON.stringify(INITIAL_DAILY_REPORT));
         saveState();
         renderApp();
       }
     }
 
-    // 獨立匯出 Daily Report PDF 引擎 (完全不與週報/排程合併)
+    // 獨立匯出 Daily Report PDF 引擎 (標註組別 Jane)
     function downloadDailyReportPDF() {
       const reportHtml = generateDailyReportPrintHTML();
       const tempContainer = document.createElement('div');
@@ -545,7 +656,7 @@
 
       const opt = {
         margin: [8, 8, 8, 8],
-        filename: `Daily_Report_${dailyReportDate}.pdf`,
+        filename: `Daily_Report_${currentTeam}_${dailyReportDate}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0, windowWidth: 1080 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
@@ -567,7 +678,7 @@
         <!DOCTYPE html>
         <html>
         <head>
-          <title>Daily Report - ${dailyReportDate}</title>
+          <title>Daily Report (${currentTeam}) - ${dailyReportDate}</title>
           <meta charset="utf-8">
           <style>
             @page { size: A4 landscape; margin: 8mm; }
@@ -593,7 +704,10 @@
           <!-- 頂部標題 -->
           <div style="border-bottom: 2px solid #0f766e; padding-bottom: 8px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: flex-end;">
             <div>
-              <h1 style="font-size: 22px; font-weight: bold; color: #0f766e; margin: 0;">Daily Report</h1>
+              <h1 style="font-size: 22px; font-weight: bold; color: #0f766e; margin: 0; display: flex; align-items: center; gap: 8px;">
+                <span>Daily Report</span>
+                <span style="font-size: 12px; background: #ccfbf1; color: #0f766e; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${currentTeam}</span>
+              </h1>
               <p style="font-size: 11px; color: #64748b; margin: 4px 0 0 0;">Highlights / Actions / Risk Level / Check Point</p>
             </div>
             <div style="text-align: right; font-size: 11px; color: #334155;">
@@ -648,13 +762,14 @@
           </table>
 
           <div style="font-size: 10px; color: #64748b; text-align: right; margin-top: 12px;">
-            Daily Report • Page 1 of 1
+            Daily Report • ${currentTeam} • Page 1 of 1
           </div>
         </div>
       `;
     }
 
     function renderApp() {
+      if (!checkAuth()) return;
       const scrollContainer = document.getElementById('masterScrollContainer');
       const savedScrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0;
 
@@ -669,16 +784,35 @@
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-teal-700 flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-sm flex-shrink-0">PM</div>
             <div>
-              <h1 class="text-base sm:text-lg md:text-xl font-bold text-slate-800 tracking-tight flex items-center gap-1.5 sm:gap-2">
-                <span>PM 專案管理系統</span>
-                <span class="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 font-medium">週報 / 日報雙模式</span>
-              </h1>
-              <p class="text-[11px] sm:text-xs text-slate-500">已啟用智能歷史快取保護，支援一鍵備份/還原，資料永不遺失</p>
+              <div class="flex items-center gap-2 flex-wrap">
+                <h1 class="text-base sm:text-lg md:text-xl font-bold text-slate-800 tracking-tight">
+                  PM 專案管理系統
+                </h1>
+                <!-- 當前組別徽章 (已將 Team A 預設改名為 Jane) -->
+                <div class="flex items-center gap-1 bg-teal-50 border border-teal-300 text-teal-800 text-xs px-2.5 py-0.5 rounded-full font-bold shadow-sm">
+                  <span>🏷️ 組別:</span>
+                  <select onchange="switchTeam(this.value)" class="bg-transparent font-extrabold focus:outline-none cursor-pointer">
+                    <option value="Jane" ${currentTeam === 'Jane' ? 'selected' : ''}>Jane</option>
+                    <option value="B" ${currentTeam === 'B' ? 'selected' : ''}>Team B</option>
+                    <option value="C" ${currentTeam === 'C' ? 'selected' : ''}>Team C</option>
+                    <option value="${currentTeam}" ${!['Jane','B','C'].includes(currentTeam) ? 'selected' : ''}>${currentTeam} (自訂)</option>
+                  </select>
+                  <button onclick="promptNewTeam()" title="新增或切換自訂組別" class="text-teal-600 hover:text-teal-900 ml-1 text-xs">➕</button>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 text-[11px] sm:text-xs text-slate-500 flex-wrap">
+                <span>網址參數隔離已啟用 (team=${currentTeam})</span>
+                <span class="text-slate-300">|</span>
+                <span class="text-teal-700 font-semibold flex items-center gap-1">
+                  <span>👤</span><span>${getLoggedInUser() || '使用者'}</span>
+                </span>
+                <button onclick="handleLogout()" class="text-rose-600 hover:text-rose-800 font-semibold underline text-[11px]">登出</button>
+              </div>
             </div>
           </div>
 
           <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            <!-- 模式切換標籤頁 (新增 Daily Report 專屬 Sheet) -->
+            <!-- 模式切換標籤頁 -->
             <div class="bg-slate-100 p-0.5 sm:p-1 rounded-lg flex text-[11px] sm:text-xs font-semibold border border-slate-200">
               <button onclick="setViewMode('both')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'both' ? 'bg-white text-teal-800 shadow-sm font-bold' : 'text-slate-600'}">雙模式</button>
               <button onclick="setViewMode('master')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'master' ? 'bg-white text-teal-800 shadow-sm font-bold' : 'text-slate-600'}">總排程</button>
@@ -686,8 +820,8 @@
               <button onclick="setViewMode('daily')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'daily' ? 'bg-teal-700 text-white shadow-sm font-bold' : 'text-teal-700 font-bold hover:bg-slate-200'}">📋 Daily Report</button>
             </div>
 
-            <button onclick="exportBackupJSON()" title="將目前所有修改資料下載成備份檔" class="bg-slate-700 hover:bg-slate-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition flex items-center gap-1">💾 備份資料</button>
-            <button onclick="triggerImportJSON()" title="上傳先前的備份檔還原" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium transition flex items-center gap-1">📂 還原資料</button>
+            <button onclick="exportBackupJSON()" title="將目前組別的所有資料下載成備份檔" class="bg-slate-700 hover:bg-slate-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition flex items-center gap-1">💾 備份資料</button>
+            <button onclick="triggerImportJSON()" title="上傳備份檔還原至目前組別" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium transition flex items-center gap-1">📂 還原資料</button>
 
             ${viewMode === 'daily' ? `
               <button onclick="addDailyProject()" class="bg-teal-700 hover:bg-teal-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition">+ 新增專案項</button>
@@ -708,7 +842,7 @@
           <div class="p-3 sm:p-4 bg-teal-800 text-white flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-3">
               <span class="bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded">Daily Sheet</span>
-              <h2 class="text-base sm:text-lg font-bold tracking-tight">Daily Report</h2>
+              <h2 class="text-base sm:text-lg font-bold tracking-tight">Daily Report (${currentTeam})</h2>
             </div>
             <div class="flex items-center gap-2 text-xs">
               <span class="text-teal-200 font-medium">Date:</span>
@@ -806,7 +940,7 @@
           </div>
 
           <div class="bg-slate-50 border-t border-slate-200 px-4 py-2.5 flex items-center justify-between text-xs text-slate-500">
-            <span>Daily Report Dedicated Sheet • 獨立排版與 PDF 匯出</span>
+            <span>Daily Report Dedicated Sheet • ${currentTeam} 獨立排版與 PDF 匯出</span>
             <div class="flex items-center gap-2">
               <button onclick="downloadDailyReportPDF()" class="no-print text-xs text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1">
                 <span>⬇️ 匯出獨立 Daily PDF</span>
@@ -820,7 +954,7 @@
           <div class="p-3 sm:p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
             <div class="flex items-center gap-2">
               <div class="w-2.5 h-4 sm:h-5 bg-teal-600 rounded"></div>
-              <h2 class="text-sm sm:text-base font-bold text-slate-800 tracking-tight">PM weekly report</h2>
+              <h2 class="text-sm sm:text-base font-bold text-slate-800 tracking-tight">PM weekly report (${currentTeam})</h2>
               <span class="text-[11px] sm:text-xs text-slate-400">（共 ${projects.length} 項治具，點選「專案」切換週報，點擊 🎨 設定醒目顏色）</span>
             </div>
             <div class="no-print flex items-center gap-1.5 sm:gap-2">
@@ -1186,14 +1320,16 @@
     }
 
     function resetToInitialData() {
-      try {
-        localStorage.removeItem('PM_SYSTEM_ACTIVE_PROJECTS');
-        localStorage.removeItem('PM_SYSTEM_ACTIVE_WEEKS');
-      } catch (e) {}
-      weeks = DEFAULT_WEEKS;
-      projects = JSON.parse(JSON.stringify(INITIAL_PROJECTS));
-      selectedId = projects[1].id;
-      renderApp();
+      if (confirm(`確定要將 [組別: ${currentTeam}] 的週報資料還原回預設嗎？`)) {
+        try {
+          localStorage.removeItem(STORAGE_KEY_PROJ);
+          localStorage.removeItem(STORAGE_KEY_WEEK);
+        } catch (e) {}
+        weeks = DEFAULT_WEEKS;
+        projects = JSON.parse(JSON.stringify(INITIAL_PROJECTS));
+        selectedId = projects[1].id;
+        renderApp();
+      }
     }
 
     function addNewWeek() {
@@ -1259,7 +1395,10 @@
           <div style="page-break-after: always; padding-bottom: 20px;">
             <div style="border-bottom: 2px solid #0f766e; padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-end;">
               <div>
-                <h1 style="font-size: 20px; font-weight: bold; color: #0f766e; margin: 0;">PM weekly report — 專案時程總排程</h1>
+                <h1 style="font-size: 20px; font-weight: bold; color: #0f766e; margin: 0; display: flex; align-items: center; gap: 8px;">
+                  <span>PM weekly report — 專案時程總排程</span>
+                  <span style="font-size: 11px; background: #ccfbf1; color: #0f766e; padding: 2px 8px; border-radius: 4px;">${currentTeam}</span>
+                </h1>
                 <p style="font-size: 11px; color: #64748b; margin: 4px 0 0 0;">橫向排版重點時程彙整（Master Schedule Overview & Key Milestones）</p>
               </div>
               <div style="font-size: 11px; color: #475569; font-weight: bold;">報告日期: 2026-11-03</div>
@@ -1311,13 +1450,13 @@
                 }).join('')}
               </tbody>
             </table>
-            <div style="font-size: 10px; color: #64748b; text-align: right;">PM Weekly Report • Master Schedule Summary • Page 1 of 2</div>
+            <div style="font-size: 10px; color: #64748b; text-align: right;">PM Weekly Report • ${currentTeam} • Page 1 of 2</div>
           </div>
 
           <div style="padding-top: 10px;">
             <div style="background: #0f766e; color: #ffffff; padding: 10px 14px; border-radius: 6px 6px 0 0; display: flex; justify-content: space-between; align-items: center;">
               <span style="font-size: 15px; font-weight: bold;">NPI Project (${curProj.fixture || '治具名稱'}) - ${curProj.phase || '階段'}</span>
-              <span style="font-size: 11px; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 4px;">Detail Weekly Report</span>
+              <span style="font-size: 11px; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 4px;">Detail Weekly Report (${currentTeam})</span>
             </div>
 
             <div style="border: 1px solid #0f766e; border-top: none; padding: 14px; font-size: 11px; border-radius: 0 0 6px 6px;">
@@ -1356,7 +1495,7 @@
                   </thead>
                   <tbody>
                     ${(curProj.demands || []).map(d => `
-                      <tr>
+                      <tr class="hover:bg-slate-50/70">
                         <td style="padding: 4px 6px; border: 1px solid #cbd5e1; text-align: left; font-weight: bold;">${d.demand || '-'}</td>
                         <td style="padding: 4px 6px; border: 1px solid #cbd5e1;">${d.qty || '-'}</td>
                         <td style="padding: 4px 6px; border: 1px solid #cbd5e1;">${d.site || '-'}</td>
@@ -1404,14 +1543,16 @@
                 </tr>
               </table>
             </div>
-            <div style="font-size: 10px; color: #64748b; text-align: right; margin-top: 8px;">PM Weekly Report • Detailed Fixture Report • Page 2 of 2</div>
+            <div style="font-size: 10px; color: #64748b; text-align: right; margin-top: 8px;">PM Weekly Report • Detailed Fixture Report • ${currentTeam} • Page 2 of 2</div>
           </div>
         </div>
       `;
     }
 
     function openPrintModal() {
-      document.getElementById('modalPreviewBody').innerHTML = generateCleanReportHTML();
+      const container = document.getElementById('modalPreviewBody');
+      container.innerHTML = generateCleanReportHTML();
+      document.getElementById('printModalTeamTag').innerText = `${currentTeam} • A4 橫向重點摘要版`;
       document.getElementById('printModal').classList.remove('hidden');
     }
     function closePrintModal() { document.getElementById('printModal').classList.add('hidden'); }
@@ -1424,7 +1565,7 @@
       document.body.appendChild(tempContainer);
       const opt = {
         margin: [5, 5, 5, 5],
-        filename: `PM_Weekly_Report_${(curProj.fixture || 'Project').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`,
+        filename: `PM_Weekly_Report_${currentTeam}_${(curProj.fixture || 'Project').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0, windowWidth: 1100 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
@@ -1445,7 +1586,7 @@
         <!DOCTYPE html>
         <html>
         <head>
-          <title>PM Weekly Report - 正式列印</title>
+          <title>PM Weekly Report (${currentTeam}) - 正式列印</title>
           <meta charset="utf-8">
           <style>
             @page { size: A4 landscape; margin: 8mm; }
@@ -1465,10 +1606,11 @@
       printWindow.document.close();
     }
 
-    // 資料備份與還原功能
+    // 資料備份與還原功能 (支援組別標註)
     function exportBackupJSON() {
       const data = {
         version: '2026.11',
+        team: currentTeam,
         exportDate: new Date().toISOString(),
         projects: projects,
         weeks: weeks,
@@ -1479,7 +1621,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `PM_System_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `PM_Backup_${currentTeam}_${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1505,7 +1647,7 @@
               selectedId = projects.find(p => p.project === 'NNV1') ? projects.find(p => p.project === 'NNV1').id : projects[0].id;
               saveState();
               renderApp();
-              alert('✅ 備份資料還原成功！');
+              alert(`✅ 備份資料已成功還原至 [組別: ${currentTeam}]！`);
             } else {
               alert('❌ 檔案格式不符合！');
             }
@@ -1518,6 +1660,7 @@
       input.click();
     }
 
+    checkAuth();
     renderApp();
   </script>
 </body>
