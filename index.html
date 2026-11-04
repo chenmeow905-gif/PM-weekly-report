@@ -451,8 +451,6 @@
       } 
     }
 
-    // 調色盤邏輯
-    let activePaletteTarget = null;
     function openColorPalette(projId, weekId, btnEl) {
       const proj = projects.find(p => p.id === projId);
       const mItem = (proj && proj.milestones && proj.milestones[weekId]) || '';
@@ -622,7 +620,6 @@
       }
     }
 
-    // 增強型下載 Daily Report PDF (包含直接原生備用觸發)
     function downloadDailyReportPDF() {
       try {
         const reportHtml = generateDailyReportPrintHTML();
@@ -661,28 +658,12 @@
         window.print();
         return;
       }
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Daily Report (${currentTeam}) - ${dailyReportDate}</title>
-          <meta charset="utf-8">
-          <style>
-            @page { size: A4 landscape; margin: 8mm; }
-            body { margin: 0; padding: 0; background: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-          </style>
-        </head>
-        <body>
-          ${reportHtml}
-          <script>
-            window.onload = function() {
-              setTimeout(function() { window.print(); }, 300);
-            };
-          <\/script>
-        </body>
-        </html>
-      `);
+      printWindow.document.write('<!DOCTYPE html><html><head><title>Daily Report (' + currentTeam + ') - ' + dailyReportDate + '</title><meta charset="utf-8"><style>@page { size: A4 landscape; margin: 8mm; } body { margin: 0; padding: 0; background: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }</style></head><body>' + reportHtml + '</body></html>');
       printWindow.document.close();
+      setTimeout(function() {
+        printWindow.focus();
+        printWindow.print();
+      }, 400);
     }
 
     function generateDailyReportPrintHTML() {
@@ -753,7 +734,7 @@
       `;
     }
 
-    // 增強型直接下載 Weekly Report PDF (對齊 Daily PDF 直接下載)
+    // 增強型直接下載 Weekly Report PDF
     function downloadWeeklyReportPDF() {
       try {
         const curProj = projects.find(p => p.id === selectedId) || projects[0] || {};
@@ -786,491 +767,89 @@
       }
     }
 
-    function renderApp() {
-      if (!checkAuth()) return;
-      const scrollContainer = document.getElementById('masterScrollContainer');
-      const savedScrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0;
-
-      saveState();
-      const curProj = projects.find(p => p.id === selectedId) || projects[0] || {};
-      const monthGroups = getMonthGroups();
-
-      const app = document.getElementById('app');
-      app.innerHTML = `
-        <!-- 頂部導航列 -->
-        <header class="no-print bg-white rounded-xl shadow-sm border border-slate-200 p-3 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-teal-700 flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-sm flex-shrink-0">PM</div>
-            <div>
-              <div class="flex items-center gap-2 flex-wrap">
-                <h1 class="text-base sm:text-lg md:text-xl font-bold text-slate-800 tracking-tight">
-                  PM 專案管理系統
-                </h1>
-                <div class="flex items-center gap-1 bg-teal-50 border border-teal-300 text-teal-800 text-xs px-2.5 py-0.5 rounded-full font-bold shadow-sm">
-                  <span>🏷️ 組別:</span>
-                  <select onchange="switchTeam(this.value)" class="bg-transparent font-extrabold focus:outline-none cursor-pointer">
-                    <option value="" ${!currentTeam ? 'selected' : ''}>請選擇</option>
-                    <option value="Jane" ${currentTeam === 'Jane' ? 'selected' : ''}>Jane</option>
-                    ${currentTeam && currentTeam !== 'Jane' ? `<option value="${currentTeam}" selected>${currentTeam} (自訂)</option>` : ''}
-                  </select>
-                  <button type="button" onclick="promptNewTeam()" title="新增空白新組別" class="text-teal-600 hover:text-teal-900 ml-1 text-xs">➕</button>
-                </div>
-              </div>
-              <div class="flex items-center gap-3 text-[11px] sm:text-xs text-slate-500 flex-wrap">
-                <span>${currentTeam ? `組別: ${currentTeam} 專屬空間 (?team=${currentTeam})` : '尚未選擇組別，請由上方選取【Jane】或點擊【➕】新增'}</span>
-                <span class="text-slate-300">|</span>
-                <span class="text-teal-700 font-semibold flex items-center gap-1">
-                  <span>👤</span><span>${getLoggedInUser() || '使用者'}</span>
-                </span>
-                <button type="button" onclick="handleLogout()" class="text-rose-600 hover:text-rose-800 font-semibold underline text-[11px]">登出</button>
-              </div>
-            </div>
-          </div>
-
-          ${currentTeam ? `
-            <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <div class="bg-slate-100 p-0.5 sm:p-1 rounded-lg flex text-[11px] sm:text-xs font-semibold border border-slate-200">
-                <button type="button" onclick="setViewMode('both')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'both' ? 'bg-white text-teal-800 shadow-sm font-bold' : 'text-slate-600'}">雙模式</button>
-                <button type="button" onclick="setViewMode('master')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'master' ? 'bg-white text-teal-800 shadow-sm font-bold' : 'text-slate-600'}">總排程</button>
-                <button type="button" onclick="setViewMode('detail')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'detail' ? 'bg-white text-teal-800 shadow-sm font-bold' : 'text-slate-600'}">單頁週報</button>
-                <button type="button" onclick="setViewMode('daily')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'daily' ? 'bg-teal-700 text-white shadow-sm font-bold' : 'text-teal-700 font-bold hover:bg-slate-200'}">📋 Daily Report</button>
-              </div>
-
-              <button type="button" onclick="exportBackupJSON()" title="將目前組別的所有資料下載成備份檔" class="bg-slate-700 hover:bg-slate-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition flex items-center gap-1">💾 備份資料</button>
-              <button type="button" onclick="triggerImportJSON()" title="上傳備份檔還原至目前組別" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium transition flex items-center gap-1">📂 還原資料</button>
-
-              ${viewMode === 'daily' ? `
-                <button type="button" onclick="addDailyProject()" class="bg-teal-700 hover:bg-teal-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition">+ 新增專案項</button>
-                <button type="button" onclick="downloadDailyReportPDF()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-1"><span>📄</span><span>匯出 Daily PDF</span></button>
-                <button type="button" onclick="printDailyReportWindow()" class="bg-slate-800 hover:bg-slate-900 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition hidden sm:inline-block">列印日報</button>
-                <button type="button" onclick="resetDailyReport()" class="text-[11px] sm:text-xs text-rose-600 hover:bg-rose-50 px-2 py-1.5 rounded-lg transition">還原日報範本</button>
-              ` : `
-                <button type="button" onclick="addNewProject()" class="bg-teal-700 hover:bg-teal-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition">+ 治具</button>
-                <button type="button" onclick="downloadWeeklyReportPDF()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-1"><span>📄</span><span>匯出 PDF</span></button>
-                <button type="button" onclick="openDedicatedPrintWindow()" class="bg-slate-800 hover:bg-slate-900 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition hidden sm:inline-block">列印週報</button>
-                <button type="button" onclick="resetToInitialData()" class="text-[11px] sm:text-xs text-rose-600 hover:bg-rose-50 px-2 py-1.5 rounded-lg transition">恢復報告資訊</button>
-              `}
-            </div>
-          ` : ''}
-        </header>
-
-        ${!currentTeam ? `
-          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 sm:p-12 text-center my-6 max-w-2xl mx-auto">
-            <div class="w-16 h-16 bg-teal-50 text-teal-700 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 border border-teal-200">
-              🏷️
-            </div>
-            <h2 class="text-xl font-bold text-slate-800 mb-2">歡迎使用 PM 專案管理系統</h2>
-            <p class="text-sm text-slate-600 mb-6 leading-relaxed">
-              目前尚未選取組別。請由上方下拉選單選擇【Jane】查看進行中的 WNV1 專案，<br>
-              或點擊【➕】建立專屬的全新空白組別（僅提供完整表格結構，不帶入他人內容）。
-            </p>
-            <div class="flex items-center justify-center gap-3">
-              <button type="button" onclick="switchTeam('Jane')" class="bg-teal-700 hover:bg-teal-800 text-white text-sm font-bold px-5 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5">
-                <span>進入 Jane 組別</span>
-              </button>
-              <button type="button" onclick="promptNewTeam()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold px-5 py-2.5 rounded-xl border border-slate-300 transition flex items-center gap-1.5">
-                <span>➕ 建立全新空白組別</span>
-              </button>
-            </div>
-          </div>
-        ` : `
-          <!-- 模組三：全新獨立專用 Daily Report -->
-          <section id="section-daily" class="${viewMode !== 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border-2 border-teal-700 overflow-hidden">
-            <div class="p-3 sm:p-4 bg-teal-800 text-white flex flex-wrap items-center justify-between gap-3">
-              <div class="flex items-center gap-3">
-                <span class="bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded">Daily Sheet</span>
-                <h2 class="text-base sm:text-lg font-bold tracking-tight">Daily Report (${currentTeam})</h2>
-              </div>
-              <div class="flex items-center gap-2 text-xs">
-                <span class="text-teal-200 font-medium">日報日期:</span>
-                <input type="date" value="${dailyReportDate}" onchange="updateDailyDate(this.value)" class="bg-teal-900 border border-teal-600 text-white text-xs px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-teal-400 cursor-pointer" />
-              </div>
-            </div>
-
-            <div class="overflow-x-auto touch-scroll max-h-[640px] text-xs">
-              <table class="w-full border-collapse text-left min-w-[950px]">
-                <thead class="bg-slate-100 text-slate-700 sticky top-0 z-20 select-none shadow-sm">
-                  <tr class="border-b border-slate-300 font-bold text-xs bg-slate-200">
-                    <th class="p-2.5 border-r border-slate-300 w-12 text-center">No.</th>
-                    <th class="p-2.5 border-r border-slate-300 w-44">Project</th>
-                    <th class="p-2.5 border-r border-slate-300">Highlights / Actions</th>
-                    <th class="p-2.5 border-r border-slate-300 w-28 text-center">Risk level</th>
-                    <th class="p-2.5 border-r border-slate-300 w-32 text-center">Check point</th>
-                    <th class="no-print p-2.5 w-16 text-center bg-slate-200">操作</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-200">
-                  ${dailyReports.map((dItem, pIdx) => `
-                    <tr class="hover:bg-slate-50/80 transition ${pIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}">
-                      <td class="p-2 border-r border-slate-200 text-center font-bold text-slate-600 align-top">
-                        ${dItem.no}
-                      </td>
-                      <td class="p-2 border-r border-slate-200 align-top">
-                        <input 
-                          type="text" 
-                          value="${dItem.project}" 
-                          oninput="updateDailyProject(${pIdx}, 'project', this.value)" 
-                          class="w-full bg-transparent font-bold text-teal-800 text-xs py-1 px-1.5 focus:bg-white rounded border border-transparent hover:border-slate-300 focus:border-teal-500" 
-                        />
-                      </td>
-                      <td class="p-2 border-r border-slate-200 align-top">
-                        <div class="space-y-1.5">
-                          ${dItem.actions.map((act, aIdx) => `
-                            <div class="flex items-start gap-1.5 group/act">
-                              <span class="text-teal-600 font-bold mt-1 text-[11px]">•</span>
-                              <textarea 
-                                rows="${Math.max(1, Math.ceil(act.length / 55))}" 
-                                oninput="updateDailyAction(${pIdx}, ${aIdx}, this.value)" 
-                                class="w-full text-xs p-1 bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-teal-500 rounded focus:outline-none transition leading-relaxed text-slate-800"
-                              >${act}</textarea>
-                              <button 
-                                type="button"
-                                onclick="deleteDailyAction(${pIdx}, ${aIdx})" 
-                                title="刪除此項"
-                                class="no-print text-slate-300 hover:text-rose-600 text-xs px-1 opacity-0 group-hover/act:opacity-100 transition mt-1"
-                              >✕</button>
-                            </div>
-                          `).join('')}
-                          <button 
-                            type="button"
-                            onclick="addDailyAction(${pIdx})" 
-                            class="no-print text-[11px] text-teal-700 hover:text-teal-900 font-semibold flex items-center gap-1 mt-1 px-1 py-0.5 rounded hover:bg-teal-50 transition"
-                          >
-                            <span>+ 新增事項</span>
-                          </button>
-                        </div>
-                      </td>
-                      <td class="p-2 border-r border-slate-200 text-center align-top">
-                        <select 
-                          onchange="updateDailyProject(${pIdx}, 'risk', this.value)" 
-                          class="text-xs font-bold px-2.5 py-1 rounded-md border focus:outline-none cursor-pointer transition shadow-sm ${
-                            dItem.risk === 'High' ? 'bg-rose-100 text-rose-800 border-rose-400 font-extrabold ring-1 ring-rose-300' :
-                            (dItem.risk === 'Medium' ? 'bg-amber-100 text-amber-800 border-amber-400' :
-                            (dItem.risk === 'Low' ? 'bg-emerald-100 text-emerald-800 border-emerald-400' : 'bg-slate-100 text-slate-700 border-slate-300'))
-                          }"
-                        >
-                          <option value="High" class="bg-rose-100 text-rose-800 font-bold" ${dItem.risk === 'High' ? 'selected' : ''}>High</option>
-                          <option value="Medium" class="bg-amber-100 text-amber-800 font-bold" ${dItem.risk === 'Medium' ? 'selected' : ''}>Medium</option>
-                          <option value="Low" class="bg-emerald-100 text-emerald-800 font-bold" ${dItem.risk === 'Low' ? 'selected' : ''}>Low</option>
-                          <option value="Normal" class="bg-slate-100 text-slate-700" ${dItem.risk === 'Normal' ? 'selected' : ''}>Normal</option>
-                        </select>
-                      </td>
-                      <td class="p-2 border-r border-slate-200 text-center align-top">
-                        <input 
-                          type="text" 
-                          value="${dItem.checkpoint || 'Daily Check'}" 
-                          oninput="updateDailyProject(${pIdx}, 'checkpoint', this.value)" 
-                          class="w-full text-center bg-transparent py-1 px-1 text-xs text-slate-700 font-medium focus:bg-white rounded border border-transparent hover:border-slate-300 focus:border-teal-500" 
-                        />
-                      </td>
-                      <td class="no-print p-2 text-center align-top">
-                        <button 
-                          type="button"
-                          onclick="deleteDailyProject(${pIdx})" 
-                          title="刪除整個專案項"
-                          class="text-slate-400 hover:text-rose-600 font-bold text-xs p-1 rounded hover:bg-rose-50 transition"
-                        >
-                          刪除
-                        </button>
-                      </td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            </div>
-
-            <div class="bg-slate-50 border-t border-slate-200 px-4 py-2.5 flex items-center justify-between text-xs text-slate-500">
-              <span>Daily Report Dedicated Sheet • ${currentTeam} 獨立排版與 PDF 匯出</span>
-              <div class="flex items-center gap-2">
-                <button type="button" onclick="downloadDailyReportPDF()" class="no-print text-xs text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1">
-                  <span>⬇️ 匯出獨立 Daily PDF</span>
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <!-- 模組一：總排程主表 (Master Schedule) -->
-          <section id="section-master" class="${viewMode === 'detail' || viewMode === 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div class="p-3 sm:p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-              <div class="flex items-center gap-2 flex-wrap">
-                <div class="w-2.5 h-4 sm:h-5 bg-teal-600 rounded"></div>
-                <h2 class="text-sm sm:text-base font-bold text-slate-800 tracking-tight">PM weekly report (${currentTeam})</h2>
-                <span class="text-[11px] sm:text-xs text-slate-400">（共 ${projects.length} 項治具）</span>
-                <div class="no-print flex items-center gap-1 text-xs bg-white border border-slate-300 px-2 py-0.5 rounded-md shadow-sm ml-2">
-                  <span class="text-slate-500 font-medium">📅 週報日期:</span>
-                  <input 
-                    type="date" 
-                    value="${weeklyReportDate}" 
-                    onchange="updateWeeklyDate(this.value)" 
-                    class="text-xs font-bold text-teal-800 bg-transparent focus:outline-none cursor-pointer" 
-                  />
-                </div>
-              </div>
-              <div class="no-print flex items-center gap-1.5 sm:gap-2">
-                <button type="button" onclick="addNewWeek()" class="text-[11px] sm:text-xs bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-md transition">+ 新增週次</button>
-                <button type="button" onclick="addNewProject()" class="text-[11px] sm:text-xs bg-teal-600 hover:bg-teal-700 text-white font-medium px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-md transition">+ 新增治具</button>
-              </div>
-            </div>
-
-            <div id="masterScrollContainer" class="overflow-x-auto touch-scroll max-h-[520px] text-xs">
-              <table class="w-full border-collapse text-center min-w-[1320px]">
-                <thead class="bg-slate-100 text-slate-700 select-none shadow-sm sticky top-0 z-20">
-                  <tr class="border-b border-slate-300 font-bold text-xs bg-slate-200">
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[75px] sticky-col-header">專案</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[50px]">位置</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[90px]">CM工廠</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[65px]">階段</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[170px] text-left pl-3">治具名稱 (Fixture)</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[65px]">狀態</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[75px]">交期</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[65px]">PM</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[80px]">TPE RD</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[120px]">TT EE</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[65px]">ME</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[60px]">SW</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[60px]">FAE</th>
-                    ${monthGroups.map(mg => `
-                      <th colSpan="${mg.span}" class="p-1 border-r border-slate-300 text-center font-bold text-slate-800 bg-slate-300 tracking-wider text-[11px]">${mg.month}</th>
-                    `).join('')}
-                    <th rowSpan="2" class="no-print p-2 min-w-[85px] bg-slate-200">操作</th>
-                  </tr>
-                  <tr class="border-b border-slate-300 text-[11px] font-semibold bg-slate-100">
-                    ${weeks.map(w => `
-                      <th class="p-1 border-r border-slate-300 min-w-[72px] relative group">
-                        <div class="flex flex-col items-center">
-                          <span class="text-teal-800 font-bold">${w.date}</span>
-                          <span class="text-slate-500 text-[10px]">${w.week}</span>
-                        </div>
-                        ${weeks.length > 1 ? `
-                          <button type="button" onclick="deleteWeek('${w.id}')" title="刪除此週" class="no-print absolute top-0.5 right-0.5 hidden group-hover:block text-slate-400 hover:text-rose-600 text-[10px] px-1 font-bold">×</button>
-                        ` : ''}
-                      </th>
-                    `).join('')}
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-200">
-                  ${projects.map((proj, pIdx) => {
-                    const isSel = proj.id === selectedId;
-                    return `
-                      <tr class="transition ${isSel ? 'bg-teal-50 font-medium' : (pIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60')} hover:bg-teal-50/50">
-                        <td class="p-1 border-r border-slate-200 cursor-pointer sticky-col-1" onclick="selectProject('${proj.id}')" title="點擊切換下方週報">
-                          <input type="text" value="${proj.project || ''}" onblur="commitField('${proj.id}', 'project', this.value)" class="w-full bg-transparent text-center font-bold text-teal-900 focus:bg-white rounded py-1" />
-                        </td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.location || ''}" onblur="commitField('${proj.id}', 'location', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.cm || ''}" onblur="commitField('${proj.id}', 'cm', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.phase || ''}" onblur="commitField('${proj.id}', 'phase', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 font-semibold text-slate-700" /></td>
-                        <td class="p-1 border-r border-slate-200 text-left pl-2"><input type="text" value="${proj.fixture || ''}" onblur="commitField('${proj.id}', 'fixture', this.value)" class="w-full bg-transparent focus:bg-white rounded py-1 px-1 font-medium text-slate-900" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.status || ''}" onblur="commitField('${proj.id}', 'status', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 font-bold ${
-                          proj.status === '完成' ? 'text-emerald-700' : (proj.status === '組裝' ? 'text-amber-700' : 'text-sky-700')
-                        }" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.deadline || ''}" onblur="commitField('${proj.id}', 'deadline', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-rose-700 font-semibold" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.pm || ''}" oninput="commitField('${proj.id}', 'pm', this.value)" onblur="commitField('${proj.id}', 'pm', this.value)" onkeydown="handleCellKey(event, this)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-800 font-medium" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.tpe_rd || ''}" oninput="commitField('${proj.id}', 'tpe_rd', this.value)" onblur="commitField('${proj.id}', 'tpe_rd', this.value)" onkeydown="handleCellKey(event, this)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-800 font-medium" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.tt_ee || ''}" oninput="commitField('${proj.id}', 'tt_ee', this.value)" onblur="commitField('${proj.id}', 'tt_ee', this.value)" onkeydown="handleCellKey(event, this)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-800 font-semibold" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.me || ''}" oninput="commitField('${proj.id}', 'me', this.value)" onblur="commitField('${proj.id}', 'me', this.value)" onkeydown="handleCellKey(event, this)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-800 font-medium" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.sw || ''}" oninput="commitField('${proj.id}', 'sw', this.value)" onblur="commitField('${proj.id}', 'sw', this.value)" onkeydown="handleCellKey(event, this)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-800 font-semibold" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.fae || ''}" oninput="commitField('${proj.id}', 'fae', this.value)" onblur="commitField('${proj.id}', 'fae', this.value)" onkeydown="handleCellKey(event, this)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-800 font-semibold" /></td>
-                        ${weeks.map(w => {
-                          const mItem = (proj.milestones && proj.milestones[w.id]) || '';
-                          const textVal = typeof mItem === 'object' ? (mItem.text || '') : mItem;
-                          const hasCustomColor = typeof mItem === 'object' && (mItem.bg || mItem.color);
-                          
-                          let styleAttr = '';
-                          let badgeStyle = 'bg-transparent text-slate-700';
-
-                          if (hasCustomColor) {
-                            styleAttr = `style="background-color: ${mItem.bg || '#ffffff'}; color: ${mItem.color || '#0f172a'}; font-weight: bold;"`;
-                          } else {
-                            if (textVal.includes('DFM') || textVal.includes('需求')) badgeStyle = 'bg-blue-100 text-blue-800 font-bold';
-                            else if (textVal.includes('KO') || textVal.includes('BOM')) badgeStyle = 'bg-purple-100 text-purple-800 font-bold';
-                            else if (textVal.includes('採購') || textVal.includes('備料')) badgeStyle = 'bg-amber-100 text-amber-800 font-bold';
-                            else if (textVal.includes('組裝') || textVal.includes('調適')) badgeStyle = 'bg-orange-100 text-orange-800 font-bold';
-                          }
-
-                          return `
-                            <td class="p-0.5 border-r border-slate-200 min-w-[76px] relative group/cell">
-                              <div class="relative flex items-center">
-                                <input 
-                                  type="text" 
-                                  value="${textVal}" 
-                                  placeholder="-" 
-                                  oninput="liveColorBadge(this)" 
-                                  onblur="commitMilestone('${proj.id}', '${w.id}', this.value)" 
-                                  onkeydown="handleCellKey(event, this)" 
-                                  class="w-full text-center text-[10px] leading-tight py-1 pr-3 focus:bg-white rounded ${badgeStyle}" 
-                                  ${styleAttr}
-                                />
-                                <button 
-                                  type="button" 
-                                  title="變更文字色彩與醒目標籤"
-                                  onclick="openColorPalette('${proj.id}', '${w.id}', this)"
-                                  class="no-print absolute right-0.5 opacity-0 group-hover/cell:opacity-100 transition text-[9px] text-slate-400 hover:text-teal-700 bg-white/80 rounded px-0.5 shadow-sm"
-                                >
-                                  🎨
-                                </button>
-                              </div>
-                            </td>
-                          `;
-                        }).join('')}
-                        <td class="no-print p-1">
-                          <div class="flex items-center justify-center gap-1">
-                            <button type="button" onclick="duplicateProject('${proj.id}')" title="複製" class="text-slate-500 hover:text-slate-800 text-xs px-1">複製</button>
-                            <button type="button" onclick="deleteProject('${proj.id}')" title="刪除" class="text-rose-600 hover:text-rose-800 text-xs px-1 font-bold">刪除</button>
-                          </div>
-                        </td>
-                      </tr>
-                    `;
-                  }).join('')}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <!-- 模組二：標準單頁週報卡片 (Full Report) -->
-          <section id="section-detail" class="${viewMode === 'master' || viewMode === 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border-2 border-teal-800 overflow-hidden">
-            <div class="bg-teal-800 text-white p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-              <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
-                <span class="bg-white/20 text-white text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded flex-shrink-0">Weekly Report</span>
-                <input
-                  type="text"
-                  value="NPI Project (${curProj.fixture || '治具名稱'}) - ${curProj.phase || '階段'}"
-                  onblur="commitFixtureTitle('${curProj.id}', this.value)"
-                  class="bg-transparent font-bold text-base sm:text-lg text-white border-b border-transparent hover:border-white/50 focus:border-white focus:outline-none flex-1 min-w-[200px]"
-                />
-                <div class="no-print flex items-center gap-1 text-xs bg-teal-900 border border-teal-600 px-2 py-1 rounded-md text-teal-200">
-                  <span>週報日期:</span>
-                  <input 
-                    type="date" 
-                    value="${weeklyReportDate}" 
-                    onchange="updateWeeklyDate(this.value)" 
-                    class="bg-transparent text-white font-bold text-xs focus:outline-none cursor-pointer" 
-                  />
-                </div>
-              </div>
-
-              <div class="no-print flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
-                <div class="flex items-center gap-1.5 flex-1 sm:flex-initial">
-                  <span class="text-xs text-teal-200 hidden md:inline">切換治具：</span>
-                  <select onchange="selectProject(this.value)" class="bg-teal-900 text-white text-xs px-2 py-1.5 rounded border border-teal-700 focus:outline-none w-full sm:w-auto">
-                    ${projects.map(p => `<option value="${p.id}" ${p.id === curProj.id ? 'selected' : ''}>${p.fixture || '未命名治具'} (${p.phase || 'N/A'})</option>`).join('')}
-                  </select>
-                </div>
-                <button type="button" onclick="deleteProject('${curProj.id}')" class="text-xs bg-rose-600 hover:bg-rose-700 text-white px-2.5 py-1.5 rounded transition flex-shrink-0">刪除</button>
-              </div>
-            </div>
-
-            <div class="p-3 sm:p-4 md:p-6 space-y-4 text-xs">
-              <!-- 1. Stakeholders -->
-              <div class="border border-slate-300 rounded-lg overflow-hidden">
-                <div class="grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-slate-300">
-                  <div class="md:col-span-2 bg-slate-100 font-bold p-2 text-slate-700 flex items-center text-[11px] sm:text-xs">Customer/CM</div>
-                  <div class="md:col-span-4 p-1.5"><input type="text" value="${curProj.customer || ''}" placeholder="客戶代號 / 工廠" onblur="commitField('${curProj.id}', 'customer', this.value)" class="w-full p-1 bg-transparent focus:bg-slate-50 rounded" /></div>
-                  <div class="md:col-span-2 bg-slate-100 font-bold p-2 text-slate-700 flex items-center text-[11px] sm:text-xs border-t md:border-t-0 border-slate-300">Contact (Customer)</div>
-                  <div class="md:col-span-4 p-1.5"><input type="text" value="${curProj.contact_customer || ''}" placeholder="DRI - 聯絡人" onblur="commitField('${curProj.id}', 'contact_customer', this.value)" class="w-full p-1 bg-transparent focus:bg-slate-50 rounded" /></div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-12 border-t border-slate-300 divide-y md:divide-y-0 md:divide-x divide-slate-300">
-                  <div class="md:col-span-2 bg-slate-100 font-bold p-2 text-slate-700 flex items-center text-[11px] sm:text-xs">Competitor</div>
-                  <div class="md:col-span-4 p-1.5"><input type="text" value="${curProj.competitor || 'NA'}" onblur="commitField('${curProj.id}', 'competitor', this.value)" class="w-full p-1 bg-transparent focus:bg-slate-50 rounded" /></div>
-                  <div class="md:col-span-2 bg-slate-100 font-bold p-2 text-slate-700 flex items-center text-[11px] sm:text-xs border-t md:border-t-0 border-slate-300">TT Resources</div>
-                  <div class="md:col-span-4 p-1.5"><input type="text" value="${curProj.tt_resources || ''}" placeholder="AM / PM / RD / ME 名單" onblur="commitField('${curProj.id}', 'tt_resources', this.value)" class="w-full p-1 bg-transparent focus:bg-slate-50 rounded" /></div>
-                </div>
-              </div>
-
-              <!-- 2. Demand & PO/PR 查核矩陣 -->
-              <div class="border border-slate-300 rounded-lg overflow-hidden">
-                <div class="bg-slate-100 px-3 py-2 font-bold text-slate-800 border-b border-slate-300 flex items-center justify-between text-xs">
-                  <span>Demand & PO/PR 查核矩陣</span>
-                  <button type="button" onclick="addDemand('${curProj.id}')" class="no-print text-xs text-teal-700 hover:text-teal-900 font-semibold">+ 新增需求項</button>
-                </div>
-                <div class="overflow-x-auto touch-scroll">
-                  <table class="w-full text-center border-collapse min-w-[700px]">
-                    <thead>
-                      <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-[11px]">
-                        <th class="p-2 border-r border-slate-200 text-left pl-3">Demand 需求名稱</th>
-                        <th class="p-2 border-r border-slate-200 w-16">Qty</th>
-                        <th class="p-2 border-r border-slate-200 w-24">Site</th>
-                        <th class="p-2 border-r border-slate-200 w-20">ETD</th>
-                        <th class="p-2 border-r border-slate-200 w-20">ETA</th>
-                        <th class="p-2 border-r border-slate-200 w-14">DFM</th>
-                        <th class="p-2 border-r border-slate-200 w-14">Quote</th>
-                        <th class="p-2 border-r border-slate-200 w-16">PR/PO</th>
-                        <th class="p-2 border-r border-slate-200 w-14">K/O</th>
-                        <th class="p-2 border-r border-slate-200 w-14">BOM</th>
-                        <th class="p-2 border-r border-slate-200 w-14">SW Key</th>
-                        <th class="no-print p-2 w-12">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200">
-                      ${(curProj.demands || []).map(d => `
-                        <tr class="hover:bg-slate-50/70">
-                          <td class="p-1.5 border-r border-slate-200 text-left pl-2"><input type="text" value="${d.demand || ''}" placeholder="需求治具品名" onblur="commitDemand('${curProj.id}', '${d.id}', 'demand', this.value)" class="w-full p-1 bg-transparent focus:bg-white rounded" /></td>
-                          <td class="p-1 border-r border-slate-200"><input type="text" value="${d.qty || ''}" placeholder="1" onblur="commitDemand('${curProj.id}', '${d.id}', 'qty', this.value)" class="w-full text-center p-1 bg-transparent focus:bg-white rounded" /></td>
-                          <td class="p-1 border-r border-slate-200"><input type="text" value="${d.site || ''}" placeholder="廠區" onblur="commitDemand('${curProj.id}', '${d.id}', 'site', this.value)" class="w-full text-center p-1 bg-transparent focus:bg-white rounded" /></td>
-                          <td class="p-1 border-r border-slate-200"><input type="text" value="${d.etd || ''}" placeholder="出貨日" onblur="commitDemand('${curProj.id}', '${d.id}', 'etd', this.value)" class="w-full text-center p-1 bg-transparent focus:bg-white rounded" /></td>
-                          <td class="p-1 border-r border-slate-200"><input type="text" value="${d.eta || ''}" placeholder="到廠日" onblur="commitDemand('${curProj.id}', '${d.id}', 'eta', this.value)" class="w-full text-center p-1 bg-transparent focus:bg-white rounded text-rose-600 font-semibold" /></td>
-                          ${['dfm', 'quote', 'pr_po', 'ko', 'bom', 'sw_key'].map(fKey => `
-                            <td class="p-1 border-r border-slate-200"><input type="checkbox" ${d[fKey] ? 'checked' : ''} onchange="commitDemand('${curProj.id}', '${d.id}', '${fKey}', this.checked)" class="w-4 h-4 text-teal-600 rounded cursor-pointer" /></td>
-                          `).join('')}
-                          <td class="no-print p-1"><button type="button" onclick="deleteDemand('${curProj.id}', '${d.id}')" class="text-slate-400 hover:text-rose-600 p-1 font-bold">×</button></td>
-                        </tr>
-                      `).join('')}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <!-- 3. Schedule 說明 -->
-              <div class="border border-slate-300 rounded-lg p-2.5 sm:p-3 bg-slate-50/50">
-                <div class="font-bold text-slate-800 mb-1 text-xs">Schedule 時程重點</div>
-                <input type="text" value="${curProj.schedule_desc || ''}" placeholder="例如: 需求 11/4 ETA 交付工廠，數量 2 套" onblur="commitField('${curProj.id}', 'schedule_desc', this.value)" class="w-full p-2 bg-white border border-slate-300 rounded focus:ring-1 focus:ring-teal-500 focus:outline-none text-xs" />
-              </div>
-
-              <!-- 4. Project Progress (Process 週記日誌) -->
-              <div class="border border-slate-300 rounded-lg overflow-hidden">
-                <div class="bg-slate-100 px-3 py-2 font-bold text-slate-800 border-b border-slate-300 flex items-center justify-between text-xs">
-                  <span>Project Progress (Process 歷程日誌)</span>
-                  <button type="button" onclick="addLog('${curProj.id}')" class="no-print text-xs text-teal-700 hover:text-teal-900 font-semibold">+ 新增週次日誌</button>
-                </div>
-                <div class="p-2 sm:p-3 space-y-2.5 max-h-[380px] overflow-y-auto touch-scroll">
-                  ${(curProj.progress_logs || []).map(log => `
-                    <div class="border border-slate-200 rounded-lg p-2 sm:p-2.5 bg-slate-50/60 relative group">
-                      <div class="flex items-center justify-between mb-1.5">
-                        <div class="flex items-center gap-1.5 sm:gap-2">
-                          <span class="font-bold text-teal-800 bg-teal-100 px-2 py-0.5 rounded text-[11px]">-[${log.week}]</span>
-                          <input type="text" value="${log.week}" onblur="commitLog('${curProj.id}', '${log.id}', 'week', this.value)" class="text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded px-1.5 py-0.5 w-16 sm:w-20" />
-                        </div>
-                        <button type="button" onclick="deleteLog('${curProj.id}', '${log.id}')" class="no-print text-slate-400 hover:text-rose-600 text-xs px-2 py-0.5 rounded">刪除此週</button>
-                      </div>
-                      <textarea rows="3" onblur="commitLog('${curProj.id}', '${log.id}', 'content', this.value)" class="w-full text-xs p-2 bg-white border border-slate-300 rounded focus:ring-1 focus:ring-teal-500 focus:outline-none">${log.content || ''}</textarea>
-                    </div>
-                  `).join('')}
-                </div>
-              </div>
-
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                <div class="border border-amber-300 bg-amber-50/30 rounded-lg p-2.5 sm:p-3">
-                  <div class="font-bold text-amber-900 mb-1 text-xs">Special Issue / Highlight / Call Help</div>
-                  <textarea rows="3" onblur="commitField('${curProj.id}', 'special_issue', this.value)" class="w-full text-xs p-2 bg-white border border-amber-200 rounded focus:ring-1 focus:ring-amber-500 focus:outline-none">${curProj.special_issue || ''}</textarea>
-                </div>
-                <div class="border border-teal-300 bg-teal-50/30 rounded-lg p-2.5 sm:p-3">
-                  <div class="font-bold text-teal-900 mb-1 text-xs">To-do plan（下週待辦行動方案）</div>
-                  <textarea rows="3" onblur="commitField('${curProj.id}', 'todo_plan', this.value)" class="w-full text-xs p-2 bg-white border border-teal-200 rounded focus:ring-1 focus:ring-teal-500 focus:outline-none">${curProj.todo_plan || ''}</textarea>
-                </div>
-              </div>
-            </div>
-
-            <div class="bg-slate-50 border-t border-slate-200 px-3 sm:px-4 py-2 flex items-center justify-between text-[11px] text-slate-500">
-              <span>Weekly Report System (Responsive Web Design Ready)</span>
-              <span>Page 1 of 1</span>
-            </div>
-          </section>
-        `}
-      `;
-
-      const updatedScrollContainer = document.getElementById('masterScrollContainer');
-      if (updatedScrollContainer && savedScrollLeft > 0) {
-        updatedScrollContainer.scrollLeft = savedScrollLeft;
+    function openDedicatedPrintWindow() {
+      const reportHtml = generateCleanReportHTML();
+      const printWindow = window.open('', '_blank', 'width=1150,height=850');
+      if (!printWindow) {
+        window.print();
+        return;
       }
+      printWindow.document.write('<!DOCTYPE html><html><head><title>PM Weekly Report (' + currentTeam + ') - ' + weeklyReportDate + '</title><meta charset="utf-8"><style>@page { size: A4 landscape; margin: 8mm; } body { margin: 0; padding: 0; background: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }</style></head><body>' + reportHtml + '</body></html>');
+      printWindow.document.close();
+      setTimeout(function() {
+        printWindow.focus();
+        printWindow.print();
+      }, 400);
+    }
+
+    function exportBackupJSON() {
+      try {
+        const data = {
+          version: '2026.11',
+          team: currentTeam,
+          exportDate: new Date().toISOString(),
+          weeklyReportDate: weeklyReportDate,
+          dailyReportDate: dailyReportDate,
+          projects: projects,
+          weeks: weeks,
+          dailyReports: dailyReports
+        };
+        const jsonStr = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+        const fileName = `PM_Backup_${currentTeam || 'Group'}_${new Date().toISOString().slice(0, 10)}.json`;
+
+        if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+          window.navigator.msSaveOrOpenBlob(blob, fileName);
+          return;
+        }
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.setAttribute('download', fileName);
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 150);
+      } catch (err) {
+        alert('備份失敗: ' + err.message);
+      }
+    }
+
+    function triggerImportJSON() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          try {
+            const data = JSON.parse(evt.target.result);
+            if (data.projects && Array.isArray(data.projects)) {
+              projects = data.projects;
+              if (data.weeks) weeks = data.weeks;
+              if (data.dailyReports) dailyReports = data.dailyReports;
+              if (data.dailyReportDate) dailyReportDate = data.dailyReportDate;
+              if (data.weeklyReportDate) weeklyReportDate = data.weeklyReportDate;
+              selectedId = projects[0] ? projects[0].id : '';
+              saveState();
+              renderApp();
+              alert(`✅ 備份資料已成功還原至 [組別: ${currentTeam}]！`);
+            } else {
+              alert('❌ 檔案格式不符合！');
+            }
+          } catch(err) {
+            alert('❌ 讀取備份檔案失敗: ' + err.message);
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
     }
 
     function liveColorBadge(inputEl) {
@@ -1564,7 +1143,7 @@
                 <div style="padding: 8px 10px;">
                   ${(curProj.progress_logs || []).map(l => `
                     <div style="margin-bottom: 8px; line-height: 1.45;">
-                      <div style="font-weight: bold; color: #0f766e; margin-bottom: 2px;">-[${log.week}]</div>
+                      <div style="font-weight: bold; color: #0f766e; margin-bottom: 2px;">-[${l.week}]</div>
                       <div style="white-space: pre-wrap; color: #1e293b; padding-left: 6px;">${l.content || '無日誌紀錄'}</div>
                     </div>
                   `).join('')}
@@ -1591,112 +1170,7 @@
       `;
     }
 
-    function openDedicatedPrintWindow() {
-      const reportHtml = generateCleanReportHTML();
-      const printWindow = window.open('', '_blank', 'width=1150,height=850');
-      if (!printWindow) {
-        window.print();
-        return;
-      }
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>PM Weekly Report (${currentTeam}) - ${weeklyReportDate}</title>
-          <meta charset="utf-8">
-          <style>
-            @page { size: A4 landscape; margin: 8mm; }
-            body { margin: 0; padding: 0; background: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-          </style>
-        </head>
-        <body>
-          ${reportHtml}
-          <script>
-            window.onload = function() {
-              setTimeout(function() { window.print(); }, 300);
-            };
-          <\/script>
-        </body>
-        </html>
-      `);
-      printWindow.document.close();
-    }
-
-    // 強化版備份資料匯出 (強制相容全瀏覽器)
-    function exportBackupJSON() {
-      try {
-        const data = {
-          version: '2026.11',
-          team: currentTeam,
-          exportDate: new Date().toISOString(),
-          weeklyReportDate: weeklyReportDate,
-          dailyReportDate: dailyReportDate,
-          projects: projects,
-          weeks: weeks,
-          dailyReports: dailyReports
-        };
-        const jsonStr = JSON.stringify(data, null, 2);
-        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
-        const fileName = `PM_Backup_${currentTeam || 'Group'}_${new Date().toISOString().slice(0, 10)}.json`;
-
-        if (window.navigator && window.navigator.msSaveOrOpenBlob) {
-          window.navigator.msSaveOrOpenBlob(blob, fileName);
-          return;
-        }
-
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.setAttribute('download', fileName);
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }, 150);
-      } catch (err) {
-        alert('備份失敗: ' + err.message);
-      }
-    }
-
-    function triggerImportJSON() {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.json';
-      input.onchange = function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-          try {
-            const data = JSON.parse(evt.target.result);
-            if (data.projects && Array.isArray(data.projects)) {
-              projects = data.projects;
-              if (data.weeks) weeks = data.weeks;
-              if (data.dailyReports) dailyReports = data.dailyReports;
-              if (data.dailyReportDate) dailyReportDate = data.dailyReportDate;
-              if (data.weeklyReportDate) weeklyReportDate = data.weeklyReportDate;
-              selectedId = projects[0] ? projects[0].id : '';
-              saveState();
-              renderApp();
-              alert(`✅ 備份資料已成功還原至 [組別: ${currentTeam}]！`);
-            } else {
-              alert('❌ 檔案格式不符合！');
-            }
-          } catch(err) {
-            alert('❌ 讀取備份檔案失敗: ' + err.message);
-          }
-        };
-        reader.readAsText(file);
-      };
-      input.click();
-    }
-
-    // 啟動身分檢查與頁面渲染
-    if (checkAuth()) {
-      renderApp();
-    }
+    renderApp();
   </script>
 </body>
 </html>
