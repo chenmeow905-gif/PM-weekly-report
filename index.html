@@ -205,7 +205,7 @@
     let currentTeam = urlParams.get('team') || urlParams.get('group') || 'Jane';
     currentTeam = currentTeam.replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, '').trim() || 'Jane';
 
-    // 100% 完整內嵌您最新的專案與週報備份資料
+    // 100% 完整內嵌最新備份 PM_Backup_Jane_2026-11-04_2.json 之資料
     const INITIAL_WEEKS = [
       { "id": "w1", "week": "WK32", "month": "Aug-26", "date": "8/3" },
       { "id": "w2", "week": "WK33", "month": "Aug-26", "date": "8/10" },
@@ -334,7 +334,7 @@
     let projects = INITIAL_PROJECTS;
     let dailyReports = INITIAL_DAILY_REPORT;
     let dailyReportDate = '2026-11-04';
-    let weeklyReportDate = '2026-11-04'; // 支援週報報告日期自由調整
+    let weeklyReportDate = '2026-11-04';
 
     // 各組獨立 LocalStorage 鍵名
     const STORAGE_KEY_PROJ = `PM_SYSTEM_ACTIVE_PROJECTS_${currentTeam}`;
@@ -1195,118 +1195,6 @@
       projects = projects.map(p => {
         if (p.id !== projId) return p;
         return { ...p, demands: (p.demands || []).map(d => d.id === demandId ? { ...d, [field]: val } : d) };
-      });
-      saveState();
-    }
-
-    function commitLog(projId, logId, field, val) {
-      projects = projects.map(p => {
-        if (p.id !== projId) return p;
-        return { ...p, progress_logs: (p.progress_logs || []).map(l => l.id === logId ? { ...l, [field]: val } : l) };
-      });
-      saveState();
-    }
-
-    function setViewMode(m) { 
-      viewMode = m; 
-      renderApp(); 
-    }
-    
-    function selectProject(id) { if (selectedId !== id) { selectedId = id; renderApp(); } }
-
-    function addNewProject() {
-      const p = {
-        id: 'proj_' + Date.now(),
-        project: `PRJ-0${projects.length + 1}`,
-        location: 'TP',
-        cm: 'Wistron湖口',
-        phase: 'P1',
-        fixture: `測試模組治具 #${projects.length + 1}`,
-        status: '設計',
-        deadline: '11/10',
-        pm: 'Jane',
-        tpe_rd: 'Eliot',
-        tt_ee: 'X',
-        me: 'Mark',
-        sw: 'X',
-        fae: 'X',
-        milestones: {},
-        customer: 'Lenovo / Wistron湖口',
-        contact_customer: 'DRI',
-        competitor: 'NA',
-        tt_resources: 'AM: Jasmine, PM: Jane, RD: Eliot, ME: Mark',
-        demands: [],
-        schedule_desc: '',
-        progress_logs: [],
-        special_issue: '- 目前無重大卡點 (N/A)',
-        todo_plan: ''
-      };
-      projects.push(p);
-      selectedId = p.id;
-      renderApp();
-    }
-
-    function duplicateProject(id) {
-      const target = projects.find(p => p.id === id);
-      if (!target) return;
-      const copy = JSON.parse(JSON.stringify(target));
-      copy.id = 'proj_' + Date.now();
-      copy.fixture = (copy.fixture || '專案') + ' (副本)';
-      projects.push(copy);
-      selectedId = copy.id;
-      renderApp();
-    }
-
-    function deleteProject(id) {
-      projects = projects.filter(p => p.id !== id);
-      if (projects.length === 0) projects = [INITIAL_PROJECTS[0]];
-      selectedId = projects[0].id;
-      renderApp();
-    }
-
-    function resetToInitialData() {
-      if (confirm(`確定要將 [組別: ${currentTeam}] 的週報資料還原回預設嗎？`)) {
-        try {
-          localStorage.removeItem(STORAGE_KEY_PROJ);
-          localStorage.removeItem(STORAGE_KEY_WEEK);
-        } catch (e) {}
-        weeks = INITIAL_WEEKS;
-        projects = JSON.parse(JSON.stringify(INITIAL_PROJECTS));
-        selectedId = projects[0].id;
-        renderApp();
-      }
-    }
-
-    function addNewWeek() {
-      const lastWeek = weeks[weeks.length - 1];
-      let nextWkNum = 1, nextDate = '1/5', nextMonth = 'Jan-27';
-      if (lastWeek) {
-        const m = lastWeek.week.match(/\d+/);
-        if (m) nextWkNum = parseInt(m[0], 10) + 1;
-        if (lastWeek.date && lastWeek.date.includes('/')) {
-          const [mo, da] = lastWeek.date.split('/').map(n => parseInt(n, 10));
-          const d = new Date(2026, mo - 1, da);
-          d.setDate(d.getDate() + 7);
-          nextDate = `${d.getMonth() + 1}/${d.getDate()}`;
-          const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-          nextMonth = `${monthNames[d.getMonth()]}-${String(d.getFullYear()).slice(-2)}`;
-        }
-      }
-      weeks.push({ id: 'w_' + Date.now(), week: `WK${nextWkNum}`, month: nextMonth, date: nextDate });
-      renderApp();
-    }
-
-    function deleteWeek(id) {
-      if (weeks.length <= 1) return;
-      weeks = weeks.filter(w => w.id !== id);
-      renderApp();
-    }
-
-    function addDemand(projId) {
-      projects = projects.map(p => {
-        if (p.id !== projId) return p;
-        const newD = { id: 'd_' + Date.now(), demand: '', qty: '1', site: 'Wistron湖口', etd: '', eta: '', dfm: true, quote: false, pr_po: false, ko: false, bom: false, sw_key: false };
-        return { ...p, demands: [...(p.demands || []), newD] };
       });
       saveState();
       renderApp();
