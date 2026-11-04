@@ -205,7 +205,7 @@
     let currentTeam = urlParams.get('team') || urlParams.get('group') || 'Jane';
     currentTeam = currentTeam.replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, '').trim() || 'Jane';
 
-    // 100% 完整載入您最新備份檔 PM_System_Backup_2026-11-04_2.json 的資料
+    // 100% 完整內嵌您最新的專案與週報備份資料
     const INITIAL_WEEKS = [
       { "id": "w1", "week": "WK32", "month": "Aug-26", "date": "8/3" },
       { "id": "w2", "week": "WK33", "month": "Aug-26", "date": "8/10" },
@@ -306,74 +306,23 @@
     const INITIAL_DAILY_REPORT = [
       {
         "no": 1,
-        "project": "FAQ1 DOE",
+        "project": "WNV1",
         "actions": [
-          "OmRon針座（預計11/10）",
-          "已統計FAQ1連接器數量及對應TT料號",
-          "DOE Base Board備品3x已入庫"
+          "客戶端需求（3D、電路及rack)已確認（Done)",
+          "已匯整儀器備料清單及庫存統計 （Done)",
+          "DFM (PDB/BFC/FIO/TPM)已更新 （Done)",
+          "待確認AM及客戶核准下單需求 (Daily)"
         ],
         "risk": "Low",
         "checkpoint": "Daily Check"
       },
       {
         "no": 2,
-        "project": "FAQ1 P1 Nasal",
+        "project": "Other",
         "actions": [
-          "Opentop，進產測",
-          "FAE反饋現場進行120pcs DUT測試，120pcs有6pcs fail，交換slot測試結果仍然相同，待客戶確認dut狀態。此外客戶反應未到位就下壓，目前目測判斷應該是緩衝器減速至定位點時，下壓氣缸快速下壓導致，預計需調整sensor看是否改善。至於Kevin提出barcode斷線問題，客戶目前並未使用barcode測試，待後續測試調整確認",
-          "Molding已送至高雄ASE",
-          "DUT載板ESD問題，目前Nasal & Corner製作拖龍搭配ESD塗層及PEEK兩個方案測試（與壓克力比對板機構件皆已入庫，待木王探針到料）",
-          "支援RD入場申請待RD提供相關資料（已收齊資料，本週上線填寫）"
-        ],
-        "risk": "High",
-        "checkpoint": "Daily Check"
-      },
-      {
-        "no": 3,
-        "project": "FAQ1 P1 Corner",
-        "actions": [
-          "CAL board（已請PMC確認狀態）其餘板卡PMC已寄台北供RD驗板",
-          "追蹤探針交期（木王回覆10/30可提供）",
-          "自製件皆已完成",
-          "稍早產線反饋無法正常上電，調整後已正常（產線裝錯線）",
-          "Fergus預計11/16到高雄ASE"
-        ],
-        "risk": "Low",
-        "checkpoint": "Daily Check"
-      },
-      {
-        "no": 4,
-        "project": "FAQ1 P1 MLB-L",
-        "actions": [
-          "Opentop ETD:11/14 ETA:11/17 高雄ASE",
-          "Molding ETD:12/8 ETA:12/11 高雄ASE（USI更新排程）",
-          "Layout中，已提供Base Board layout給客戶review，其餘layout預計本週提供",
-          "DFM描述待更新",
-          "OmRon片針備料（QC檢反應彈力問題，已與供應商確認。目前ME先採用，後續有狀況進行調整）",
-          "USI新增socket製作需求（已提供DFM，待與客戶開會討論）",
-          "電子料備料(MLB-L & R Opentop皆已提供，明日統計)"
-        ],
-        "risk": "Medium",
-        "checkpoint": "Daily Check"
-      },
-      {
-        "no": 5,
-        "project": "FAQ1 P1 MLB-R",
-        "actions": [
-          "Opentop ETD:11/14 ETA:11/17 高雄ASE",
-          "Molding ETD:12/8 ETA:12/11 高雄ASE（USI更新排程）"
-        ],
-        "risk": "Low",
-        "checkpoint": "Daily Check"
-      },
-      {
-        "no": 6,
-        "project": "FAQ1 power board",
-        "actions": [
-          "線路皆已lock down",
-          "Nasal power board PCB已回TT（電子料晚間已到TT，已請PMC安排上件）",
-          "DFM皆已lock",
-          "Corner power board PCB預計明天回TT"
+          "Weekly Report System Development （Under continuous optimization)",
+          "Daily Report System Development （Under continuous optimization)",
+          "T1000C/T1000/T3000/SSTC box 核價 （11/6)"
         ],
         "risk": "Low",
         "checkpoint": "Daily Check"
@@ -384,13 +333,15 @@
     let weeks = INITIAL_WEEKS;
     let projects = INITIAL_PROJECTS;
     let dailyReports = INITIAL_DAILY_REPORT;
-    let dailyReportDate = '2026-11-03';
+    let dailyReportDate = '2026-11-04';
+    let weeklyReportDate = '2026-11-04'; // 支援週報報告日期自由調整
 
     // 各組獨立 LocalStorage 鍵名
     const STORAGE_KEY_PROJ = `PM_SYSTEM_ACTIVE_PROJECTS_${currentTeam}`;
     const STORAGE_KEY_WEEK = `PM_SYSTEM_ACTIVE_WEEKS_${currentTeam}`;
     const STORAGE_KEY_DAILY = `PM_SYSTEM_ACTIVE_DAILY_${currentTeam}`;
-    const STORAGE_KEY_DATE = `PM_SYSTEM_ACTIVE_DATE_${currentTeam}`;
+    const STORAGE_KEY_DAILY_DATE = `PM_SYSTEM_ACTIVE_DATE_${currentTeam}`;
+    const STORAGE_KEY_WEEKLY_DATE = `PM_SYSTEM_ACTIVE_WEEKLY_DATE_${currentTeam}`;
 
     // 載入當前組別資料
     try {
@@ -409,8 +360,10 @@
         const parsed = JSON.parse(storedDaily);
         if (Array.isArray(parsed) && parsed.length > 0) dailyReports = parsed;
       }
-      const storedDate = localStorage.getItem(STORAGE_KEY_DATE);
-      if (storedDate) dailyReportDate = storedDate;
+      const storedDailyDate = localStorage.getItem(STORAGE_KEY_DAILY_DATE);
+      if (storedDailyDate) dailyReportDate = storedDailyDate;
+      const storedWeeklyDate = localStorage.getItem(STORAGE_KEY_WEEKLY_DATE);
+      if (storedWeeklyDate) weeklyReportDate = storedWeeklyDate;
     } catch (e) {
       console.warn('LocalStorage load error:', e);
     }
@@ -422,7 +375,8 @@
         localStorage.setItem(STORAGE_KEY_PROJ, JSON.stringify(projects));
         localStorage.setItem(STORAGE_KEY_WEEK, JSON.stringify(weeks));
         localStorage.setItem(STORAGE_KEY_DAILY, JSON.stringify(dailyReports));
-        localStorage.setItem(STORAGE_KEY_DATE, dailyReportDate);
+        localStorage.setItem(STORAGE_KEY_DAILY_DATE, dailyReportDate);
+        localStorage.setItem(STORAGE_KEY_WEEKLY_DATE, weeklyReportDate);
       } catch (e) {}
     }
 
@@ -549,7 +503,13 @@
       return groups;
     }
 
-    // Daily Report 專屬方法
+    // 日期更新方法 (週報與日報各自獨立調整)
+    function updateWeeklyDate(val) {
+      weeklyReportDate = val;
+      saveState();
+      renderApp();
+    }
+
     function updateDailyDate(val) {
       dailyReportDate = val;
       saveState();
@@ -804,8 +764,8 @@
               <h2 class="text-base sm:text-lg font-bold tracking-tight">Daily Report (${currentTeam})</h2>
             </div>
             <div class="flex items-center gap-2 text-xs">
-              <span class="text-teal-200 font-medium">Date:</span>
-              <input type="date" value="${dailyReportDate}" onchange="updateDailyDate(this.value)" class="bg-teal-900 border border-teal-600 text-white text-xs px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-teal-400" />
+              <span class="text-teal-200 font-medium">日報日期:</span>
+              <input type="date" value="${dailyReportDate}" onchange="updateDailyDate(this.value)" class="bg-teal-900 border border-teal-600 text-white text-xs px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-teal-400 cursor-pointer" />
             </div>
           </div>
 
@@ -911,10 +871,20 @@
         <!-- 模組一：總排程主表 (Master Schedule) -->
         <section id="section-master" class="${viewMode === 'detail' || viewMode === 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div class="p-3 sm:p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
               <div class="w-2.5 h-4 sm:h-5 bg-teal-600 rounded"></div>
               <h2 class="text-sm sm:text-base font-bold text-slate-800 tracking-tight">PM weekly report (${currentTeam})</h2>
-              <span class="text-[11px] sm:text-xs text-slate-400">（共 ${projects.length} 項治具，點選「專案」切換週報，點擊 🎨 設定醒目顏色）</span>
+              <span class="text-[11px] sm:text-xs text-slate-400">（共 ${projects.length} 項治具）</span>
+              <!-- 週報總排程報告日期調整器 -->
+              <div class="no-print flex items-center gap-1 text-xs bg-white border border-slate-300 px-2 py-0.5 rounded-md shadow-sm ml-2">
+                <span class="text-slate-500 font-medium">📅 週報日期:</span>
+                <input 
+                  type="date" 
+                  value="${weeklyReportDate}" 
+                  onchange="updateWeeklyDate(this.value)" 
+                  class="text-xs font-bold text-teal-800 bg-transparent focus:outline-none cursor-pointer" 
+                />
+              </div>
             </div>
             <div class="no-print flex items-center gap-1.5 sm:gap-2">
               <button onclick="addNewWeek()" class="text-[11px] sm:text-xs bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-md transition">+ 新增週次</button>
@@ -1047,6 +1017,16 @@
                 onblur="commitFixtureTitle('${curProj.id}', this.value)"
                 class="bg-transparent font-bold text-base sm:text-lg text-white border-b border-transparent hover:border-white/50 focus:border-white focus:outline-none flex-1 min-w-[200px]"
               />
+              <!-- 單頁週報報告日期設定器 -->
+              <div class="no-print flex items-center gap-1 text-xs bg-teal-900 border border-teal-600 px-2 py-1 rounded-md text-teal-200">
+                <span>週報日期:</span>
+                <input 
+                  type="date" 
+                  value="${weeklyReportDate}" 
+                  onchange="updateWeeklyDate(this.value)" 
+                  class="bg-transparent text-white font-bold text-xs focus:outline-none cursor-pointer" 
+                />
+              </div>
             </div>
 
             <div class="no-print flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
@@ -1328,6 +1308,7 @@
         const newD = { id: 'd_' + Date.now(), demand: '', qty: '1', site: 'Wistron湖口', etd: '', eta: '', dfm: true, quote: false, pr_po: false, ko: false, bom: false, sw_key: false };
         return { ...p, demands: [...(p.demands || []), newD] };
       });
+      saveState();
       renderApp();
     }
 
@@ -1366,7 +1347,7 @@
                 </h1>
                 <p style="font-size: 11px; color: #64748b; margin: 4px 0 0 0;">橫向排版重點時程彙整（Master Schedule Overview & Key Milestones）</p>
               </div>
-              <div style="font-size: 11px; color: #475569; font-weight: bold;">報告日期: 2026-11-03</div>
+              <div style="font-size: 11px; color: #475569; font-weight: bold;">報告日期: ${weeklyReportDate}</div>
             </div>
 
             <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; margin-bottom: 16px;">
@@ -1517,7 +1498,7 @@
     function openPrintModal() {
       const container = document.getElementById('modalPreviewBody');
       container.innerHTML = generateCleanReportHTML();
-      document.getElementById('printModalTeamTag').innerText = `${currentTeam} • A4 橫向重點摘要版`;
+      document.getElementById('printModalTeamTag').innerText = `${currentTeam} • 報告日期: ${weeklyReportDate} • A4 橫向版`;
       document.getElementById('printModal').classList.remove('hidden');
     }
     function closePrintModal() { document.getElementById('printModal').classList.add('hidden'); }
@@ -1530,7 +1511,7 @@
       document.body.appendChild(tempContainer);
       const opt = {
         margin: [5, 5, 5, 5],
-        filename: `PM_Weekly_Report_${currentTeam}_${(curProj.fixture || 'Project').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`,
+        filename: `PM_Weekly_Report_${currentTeam}_${(curProj.fixture || 'Project').replace(/\s+/g, '_')}_${weeklyReportDate}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0, windowWidth: 1100 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
@@ -1551,7 +1532,7 @@
         <!DOCTYPE html>
         <html>
         <head>
-          <title>PM Weekly Report (${currentTeam}) - 正式列印</title>
+          <title>PM Weekly Report (${currentTeam}) - ${weeklyReportDate}</title>
           <meta charset="utf-8">
           <style>
             @page { size: A4 landscape; margin: 8mm; }
@@ -1576,10 +1557,11 @@
         version: '2026.11',
         team: currentTeam,
         exportDate: new Date().toISOString(),
+        weeklyReportDate: weeklyReportDate,
+        dailyReportDate: dailyReportDate,
         projects: projects,
         weeks: weeks,
-        dailyReports: dailyReports,
-        dailyReportDate: dailyReportDate
+        dailyReports: dailyReports
       };
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -1608,6 +1590,7 @@
               if (data.weeks) weeks = data.weeks;
               if (data.dailyReports) dailyReports = data.dailyReports;
               if (data.dailyReportDate) dailyReportDate = data.dailyReportDate;
+              if (data.weeklyReportDate) weeklyReportDate = data.weeklyReportDate;
               selectedId = projects[0] ? projects[0].id : '';
               saveState();
               renderApp();
