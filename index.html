@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>PM weekly report 專案管理系統</title>
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- html2pdf.js for Client-Side PDF Generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     @media print {
@@ -14,14 +16,31 @@
       .print-table th, .print-table td { border: 1px solid #cbd5e1 !important; padding: 4px 6px !important; }
     }
     .html2pdf__page-break { page-break-before: always; }
-    .touch-scroll { -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+    
+    .touch-scroll {
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
     ::-webkit-scrollbar { height: 6px; width: 6px; }
     ::-webkit-scrollbar-track { background: #f1f5f9; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
     @media (max-width: 1024px) {
-      .sticky-col-1 { position: sticky; left: 0; z-index: 10; background-color: #f8fafc; box-shadow: 2px 0 4px -1px rgba(0,0,0,0.06); }
-      .sticky-col-header { position: sticky; left: 0; z-index: 30; background-color: #e2e8f0; box-shadow: 2px 0 4px -1px rgba(0,0,0,0.08); }
+      .sticky-col-1 {
+        position: sticky;
+        left: 0;
+        z-index: 10;
+        background-color: #f8fafc;
+        box-shadow: 2px 0 4px -1px rgba(0,0,0,0.06);
+      }
+      .sticky-col-header {
+        position: sticky;
+        left: 0;
+        z-index: 30;
+        background-color: #e2e8f0;
+        box-shadow: 2px 0 4px -1px rgba(0,0,0,0.08);
+      }
     }
   </style>
 </head>
@@ -63,7 +82,7 @@
     </div>
   </div>
 
-  <!-- 列印預覽彈窗 -->
+  <!-- 週報列印預覽彈窗 -->
   <div id="printModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
     <div class="bg-white rounded-xl sm:rounded-2xl shadow-2xl max-w-5xl w-full max-h-[94vh] flex flex-col overflow-hidden">
       <div class="p-3 sm:p-4 bg-teal-800 text-white flex flex-wrap items-center justify-between gap-2">
@@ -182,38 +201,119 @@
       }
     ];
 
-    let viewMode = 'both';
+    // 附件 daily template.xlsx 正式內嵌資料
+    const INITIAL_DAILY_REPORT = [
+      {
+        no: 1,
+        project: "FAQ1 DOE",
+        actions: [
+          "OmRon針座（預計11/10）",
+          "已統計FAQ1連接器數量及對應TT料號",
+          "DOE Base Board備品3x已入庫"
+        ],
+        risk: "Low",
+        checkpoint: "Daily Check"
+      },
+      {
+        no: 2,
+        project: "FAQ1 P1 Nasal",
+        actions: [
+          "Opentop，進產測",
+          "FAE反饋現場進行120pcs DUT測試，120pcs有6pcs fail，交換slot測試結果仍然相同，待客戶確認dut狀態。此外客戶反應未到位就下壓，目前目測判斷應該是緩衝器減速至定位點時，下壓氣缸快速下壓導致，預計需調整sensor看是否改善。至於Kevin提出barcode斷線問題，客戶目前並未使用barcode測試，待後續測試調整確認",
+          "Molding已送至高雄ASE",
+          "DUT載板ESD問題，目前Nasal & Corner製作拖龍搭配ESD塗層及PEEK兩個方案測試（與壓克力比對板機構件皆已入庫，待木王探針到料）",
+          "支援RD入場申請待RD提供相關資料（已收齊資料，本週上線填寫）"
+        ],
+        risk: "High",
+        checkpoint: "Daily Check"
+      },
+      {
+        no: 3,
+        project: "FAQ1 P1 Corner",
+        actions: [
+          "CAL board（已請PMC確認狀態）其餘板卡PMC已寄台北供RD驗板",
+          "追蹤探針交期（木王回覆10/30可提供）",
+          "自製件皆已完成",
+          "稍早產線反饋無法正常上電，調整後已正常（產線裝錯線）",
+          "Fergus預計11/16到高雄ASE"
+        ],
+        risk: "Low",
+        checkpoint: "Daily Check"
+      },
+      {
+        no: 4,
+        project: "FAQ1 P1 MLB-L",
+        actions: [
+          "Opentop ETD:11/14 ETA:11/17 高雄ASE",
+          "Molding ETD:12/8 ETA:12/11 高雄ASE（USI更新排程）",
+          "Layout中，已提供Base Board layout給客戶review，其餘layout預計本週提供",
+          "DFM描述待更新",
+          "OmRon片針備料（QC檢反應彈力問題，已與供應商確認。目前ME先採用，後續有狀況進行調整）",
+          "USI新增socket製作需求（已提供DFM，待與客戶開會討論）",
+          "電子料備料(MLB-L & R Opentop皆已提供，明日統計)"
+        ],
+        risk: "Medium",
+        checkpoint: "Daily Check"
+      },
+      {
+        no: 5,
+        project: "FAQ1 P1 MLB-R",
+        actions: [
+          "Opentop ETD:11/14 ETA:11/17 高雄ASE",
+          "Molding ETD:12/8 ETA:12/11 高雄ASE（USI更新排程）"
+        ],
+        risk: "Low",
+        checkpoint: "Daily Check"
+      },
+      {
+        no: 6,
+        project: "FAQ1 power board",
+        actions: [
+          "線路皆已lock down",
+          "Nasal power board PCB已回TT（電子料晚間已到TT，已請PMC安排上件）",
+          "DFM皆已lock",
+          "Corner power board PCB預計明天回TT"
+        ],
+        risk: "Low",
+        checkpoint: "Daily Check"
+      }
+    ];
+
+    let viewMode = 'both'; // 'both' | 'master' | 'detail' | 'daily'
     let weeks = DEFAULT_WEEKS;
     let projects = INITIAL_PROJECTS;
+    let dailyReports = INITIAL_DAILY_REPORT;
+    let dailyReportDate = '2026-11-03';
 
     try {
-      const storedWeeks = localStorage.getItem('PM_SYSTEM_WEEKS_V17');
+      const storedWeeks = localStorage.getItem('PM_SYSTEM_WEEKS_V19');
       if (storedWeeks) weeks = JSON.parse(storedWeeks);
-      const storedProjects = localStorage.getItem('PM_SYSTEM_PROJECTS_V17');
-      if (storedProjects) {
-        projects = JSON.parse(storedProjects);
-      } else {
-        localStorage.setItem('PM_SYSTEM_PROJECTS_V17', JSON.stringify(INITIAL_PROJECTS));
-      }
+      const storedProjects = localStorage.getItem('PM_SYSTEM_PROJECTS_V19');
+      if (storedProjects) projects = JSON.parse(storedProjects);
+      const storedDaily = localStorage.getItem('PM_SYSTEM_DAILY_V19');
+      if (storedDaily) dailyReports = JSON.parse(storedDaily);
+      const storedDate = localStorage.getItem('PM_SYSTEM_DAILY_DATE_V19');
+      if (storedDate) dailyReportDate = storedDate;
     } catch (e) {}
 
     let selectedId = projects.find(p => p.project === 'NNV1') ? projects.find(p => p.project === 'NNV1').id : projects[0].id;
 
     function saveState() {
       try {
-        localStorage.setItem('PM_SYSTEM_WEEKS_V17', JSON.stringify(weeks));
-        localStorage.setItem('PM_SYSTEM_PROJECTS_V17', JSON.stringify(projects));
+        localStorage.setItem('PM_SYSTEM_WEEKS_V19', JSON.stringify(weeks));
+        localStorage.setItem('PM_SYSTEM_PROJECTS_V19', JSON.stringify(projects));
+        localStorage.setItem('PM_SYSTEM_DAILY_V19', JSON.stringify(dailyReports));
+        localStorage.setItem('PM_SYSTEM_DAILY_DATE_V19', dailyReportDate);
       } catch (e) {}
     }
 
+    // 調色盤邏輯
     let activePaletteTarget = null;
-
     function openColorPalette(projId, weekId, btnEl) {
       const proj = projects.find(p => p.id === projId);
       const mItem = (proj && proj.milestones && proj.milestones[weekId]) || '';
       const curBg = (typeof mItem === 'object' && mItem.bg) ? mItem.bg : '#ffffff';
       const curColor = (typeof mItem === 'object' && mItem.color) ? mItem.color : '#0f172a';
-
       const inputEl = btnEl.parentElement.querySelector('input');
       activePaletteTarget = { projId, weekId, inputEl };
 
@@ -267,13 +367,11 @@
       const proj = projects.find(p => p.id === projId);
       const mItem = (proj && proj.milestones && proj.milestones[weekId]) || '';
       const textVal = typeof mItem === 'object' ? (mItem.text || '') : mItem;
-
       projects = projects.map(p => {
         if (p.id !== projId) return p;
         return { ...p, milestones: { ...(p.milestones || {}), [weekId]: textVal } };
       });
       saveState();
-
       inputEl.style.backgroundColor = '';
       inputEl.style.color = '';
       inputEl.className = "w-full text-center text-[10px] leading-tight py-1 pr-3 focus:bg-white rounded font-medium";
@@ -291,7 +389,6 @@
         };
       });
       saveState();
-
       inputEl.className = "w-full text-center text-[10px] leading-tight py-1 pr-3 rounded font-bold";
       inputEl.style.backgroundColor = bg;
       inputEl.style.color = color;
@@ -318,6 +415,182 @@
       return groups;
     }
 
+    // Daily Report 專屬方法
+    function updateDailyDate(val) {
+      dailyReportDate = val;
+      saveState();
+    }
+
+    function updateDailyProject(idx, field, val) {
+      dailyReports[idx][field] = val;
+      saveState();
+    }
+
+    function updateDailyAction(projIdx, actIdx, val) {
+      dailyReports[projIdx].actions[actIdx] = val;
+      saveState();
+    }
+
+    function addDailyAction(projIdx) {
+      dailyReports[projIdx].actions.push('新重點事項...');
+      saveState();
+      renderApp();
+    }
+
+    function deleteDailyAction(projIdx, actIdx) {
+      if (dailyReports[projIdx].actions.length <= 1) return;
+      dailyReports[projIdx].actions.splice(actIdx, 1);
+      saveState();
+      renderApp();
+    }
+
+    function addDailyProject() {
+      const newNo = dailyReports.length + 1;
+      dailyReports.push({
+        no: newNo,
+        project: `新專案 #${newNo}`,
+        actions: ['新重點事項...'],
+        risk: 'Low',
+        checkpoint: 'Daily Check'
+      });
+      saveState();
+      renderApp();
+    }
+
+    function deleteDailyProject(idx) {
+      if (dailyReports.length <= 1) return;
+      dailyReports.splice(idx, 1);
+      dailyReports.forEach((d, i) => d.no = i + 1);
+      saveState();
+      renderApp();
+    }
+
+    function resetDailyReport() {
+      if (confirm('確定要將 Daily Report 還原回預設範本嗎？')) {
+        dailyReports = JSON.parse(JSON.stringify(INITIAL_DAILY_REPORT));
+        saveState();
+        renderApp();
+      }
+    }
+
+    // 獨立匯出 Daily Report PDF 引擎 (完全不與週報/排程合併)
+    function downloadDailyReportPDF() {
+      const reportHtml = generateDailyReportPrintHTML();
+      const tempContainer = document.createElement('div');
+      tempContainer.innerHTML = reportHtml;
+      document.body.appendChild(tempContainer);
+
+      const opt = {
+        margin: [8, 8, 8, 8],
+        filename: `Daily_Report_${dailyReportDate}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0, windowWidth: 1080 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+      };
+
+      html2pdf().set(opt).from(tempContainer.firstElementChild).save().then(() => {
+        document.body.removeChild(tempContainer);
+      });
+    }
+
+    function printDailyReportWindow() {
+      const reportHtml = generateDailyReportPrintHTML();
+      const printWindow = window.open('', '_blank', 'width=1150,height=850');
+      if (!printWindow) {
+        alert('請允許開啟彈出視窗以進行列印！');
+        return;
+      }
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Daily Report - ${dailyReportDate}</title>
+          <meta charset="utf-8">
+          <style>
+            @page { size: A4 landscape; margin: 8mm; }
+            body { margin: 0; padding: 0; background: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+          </style>
+        </head>
+        <body>
+          ${reportHtml}
+          <script>
+            window.onload = function() {
+              setTimeout(function() { window.print(); }, 300);
+            };
+          <\/script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+
+    function generateDailyReportPrintHTML() {
+      return `
+        <div style="width: 1040px; margin: 0 auto; background: #ffffff; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px;">
+          <!-- 頂部標題 (純淨英文標題) -->
+          <div style="border-bottom: 2px solid #0f766e; padding-bottom: 8px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: flex-end;">
+            <div>
+              <h1 style="font-size: 22px; font-weight: bold; color: #0f766e; margin: 0;">Daily Report</h1>
+              <p style="font-size: 11px; color: #64748b; margin: 4px 0 0 0;">Highlights / Actions / Risk Level / Check Point</p>
+            </div>
+            <div style="text-align: right; font-size: 11px; color: #334155;">
+              <span style="font-weight: bold;">Date: </span><span>${dailyReportDate}</span>
+            </div>
+          </div>
+
+          <!-- 正式表格 -->
+          <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
+            <thead>
+              <tr style="background: #f1f5f9; color: #1e293b; border-top: 1px solid #cbd5e1; border-bottom: 2px solid #0f766e;">
+                <th style="padding: 7px 8px; border: 1px solid #cbd5e1; width: 45px; text-align: center;">No.</th>
+                <th style="padding: 7px 10px; border: 1px solid #cbd5e1; width: 140px;">Project</th>
+                <th style="padding: 7px 10px; border: 1px solid #cbd5e1;">Highlights / Actions</th>
+                <th style="padding: 7px 8px; border: 1px solid #cbd5e1; width: 85px; text-align: center;">Risk level</th>
+                <th style="padding: 7px 8px; border: 1px solid #cbd5e1; width: 95px; text-align: center;">Check point</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${dailyReports.map((item, idx) => {
+                let riskBg = '#f1f5f9';
+                let riskCol = '#475569';
+                if (item.risk === 'High') { riskBg = '#fee2e2'; riskCol = '#b91c1c'; }
+                else if (item.risk === 'Medium') { riskBg = '#fef3c7'; riskCol = '#b45309'; }
+                else if (item.risk === 'Low') { riskBg = '#ecfdf5'; riskCol = '#047857'; }
+
+                return `
+                  <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; border-bottom: 1px solid #cbd5e1;">
+                    <td style="padding: 8px 6px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold; vertical-align: top;">
+                      ${item.no}
+                    </td>
+                    <td style="padding: 8px 10px; border: 1px solid #cbd5e1; font-weight: bold; color: #0f766e; vertical-align: top; font-size: 11.5px;">
+                      ${item.project}
+                    </td>
+                    <td style="padding: 8px 10px; border: 1px solid #cbd5e1; line-height: 1.5; vertical-align: top;">
+                      <ul style="margin: 0; padding-left: 16px;">
+                        ${item.actions.map(act => `<li style="margin-bottom: 4px; color: #1e293b;">${act}</li>`).join('')}
+                      </ul>
+                    </td>
+                    <td style="padding: 8px 6px; border: 1px solid #cbd5e1; text-align: center; vertical-align: top;">
+                      <span style="background-color: ${riskBg}; color: ${riskCol}; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; display: inline-block;">
+                        ${item.risk || 'Normal'}
+                      </span>
+                    </td>
+                    <td style="padding: 8px 6px; border: 1px solid #cbd5e1; text-align: center; vertical-align: top; font-weight: 500; color: #334155; font-size: 10.5px;">
+                      ${item.checkpoint || 'Daily Check'}
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+
+          <div style="font-size: 10px; color: #64748b; text-align: right; margin-top: 12px;">
+            Daily Report • Page 1 of 1
+          </div>
+        </div>
+      `;
+    }
+
     function renderApp() {
       const scrollContainer = document.getElementById('masterScrollContainer');
       const savedScrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0;
@@ -328,32 +601,156 @@
 
       const app = document.getElementById('app');
       app.innerHTML = `
+        <!-- 頂部導航列 -->
         <header class="no-print bg-white rounded-xl shadow-sm border border-slate-200 p-3 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-teal-700 flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-sm flex-shrink-0">PM</div>
             <div>
               <h1 class="text-base sm:text-lg md:text-xl font-bold text-slate-800 tracking-tight flex items-center gap-1.5 sm:gap-2">
-                <span>PM weekly report 專案管理系統</span>
-                <span class="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 font-medium">清晰字色版</span>
+                <span>PM 專案管理系統</span>
+                <span class="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 font-medium">週報 / 日報雙模式</span>
               </h1>
-              <p class="text-[11px] sm:text-xs text-slate-500">已調整 TT EE、SW、FAE 字體為清晰深色，並放寬欄位避免文字遮蔽</p>
+              <p class="text-[11px] sm:text-xs text-slate-500">支援總排程週報甘特大表，以及全新獨立的 Daily Report 專屬表格與 PDF 匯出</p>
             </div>
           </div>
 
           <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            <!-- 模式切換標籤頁 (新增 Daily Report 專屬 Sheet) -->
             <div class="bg-slate-100 p-0.5 sm:p-1 rounded-lg flex text-[11px] sm:text-xs font-semibold border border-slate-200">
               <button onclick="setViewMode('both')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'both' ? 'bg-white text-teal-800 shadow-sm font-bold' : 'text-slate-600'}">雙模式</button>
               <button onclick="setViewMode('master')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'master' ? 'bg-white text-teal-800 shadow-sm font-bold' : 'text-slate-600'}">總排程</button>
               <button onclick="setViewMode('detail')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'detail' ? 'bg-white text-teal-800 shadow-sm font-bold' : 'text-slate-600'}">單頁週報</button>
+              <button onclick="setViewMode('daily')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'daily' ? 'bg-teal-700 text-white shadow-sm font-bold' : 'text-teal-700 font-bold hover:bg-slate-200'}">📋 Daily Report</button>
             </div>
-            <button onclick="addNewProject()" class="bg-teal-700 hover:bg-teal-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition">+ 治具</button>
-            <button onclick="openPrintModal()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-1"><span>📄</span><span>匯出 PDF</span></button>
-            <button onclick="openDedicatedPrintWindow()" class="bg-slate-800 hover:bg-slate-900 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition hidden sm:inline-block">列印</button>
-            <button onclick="resetToInitialData()" class="text-[11px] sm:text-xs text-rose-600 hover:bg-rose-50 px-2 py-1.5 rounded-lg transition">恢復報告資訊</button>
+
+            ${viewMode === 'daily' ? `
+              <button onclick="addDailyProject()" class="bg-teal-700 hover:bg-teal-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition">+ 新增專案項</button>
+              <button onclick="downloadDailyReportPDF()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-1"><span>📄</span><span>匯出 Daily PDF</span></button>
+              <button onclick="printDailyReportWindow()" class="bg-slate-800 hover:bg-slate-900 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition hidden sm:inline-block">列印日報</button>
+              <button onclick="resetDailyReport()" class="text-[11px] sm:text-xs text-rose-600 hover:bg-rose-50 px-2 py-1.5 rounded-lg transition">還原日報範本</button>
+            ` : `
+              <button onclick="addNewProject()" class="bg-teal-700 hover:bg-teal-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition">+ 治具</button>
+              <button onclick="openPrintModal()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-1"><span>📄</span><span>匯出 PDF</span></button>
+              <button onclick="openDedicatedPrintWindow()" class="bg-slate-800 hover:bg-slate-900 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition hidden sm:inline-block">列印週報</button>
+              <button onclick="resetToInitialData()" class="text-[11px] sm:text-xs text-rose-600 hover:bg-rose-50 px-2 py-1.5 rounded-lg transition">恢復報告資訊</button>
+            `}
           </div>
         </header>
 
-        <section id="section-master" class="${viewMode === 'detail' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <!-- 模組三：全新獨立專用 Daily Report (純淨標題版) -->
+        <section id="section-daily" class="${viewMode !== 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border-2 border-teal-700 overflow-hidden">
+          <div class="p-3 sm:p-4 bg-teal-800 text-white flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <span class="bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded">Daily Sheet</span>
+              <h2 class="text-base sm:text-lg font-bold tracking-tight">Daily Report</h2>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+              <span class="text-teal-200 font-medium">Date:</span>
+              <input type="date" value="${dailyReportDate}" onchange="updateDailyDate(this.value)" class="bg-teal-900 border border-teal-600 text-white text-xs px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-teal-400" />
+            </div>
+          </div>
+
+          <div class="overflow-x-auto touch-scroll max-h-[640px] text-xs">
+            <table class="w-full border-collapse text-left min-w-[950px]">
+              <thead class="bg-slate-100 text-slate-700 sticky top-0 z-20 select-none shadow-sm">
+                <tr class="border-b border-slate-300 font-bold text-xs bg-slate-200">
+                  <th class="p-2.5 border-r border-slate-300 w-12 text-center">No.</th>
+                  <th class="p-2.5 border-r border-slate-300 w-44">Project</th>
+                  <th class="p-2.5 border-r border-slate-300">Highlights / Actions</th>
+                  <th class="p-2.5 border-r border-slate-300 w-28 text-center">Risk level</th>
+                  <th class="p-2.5 border-r border-slate-300 w-32 text-center">Check point</th>
+                  <th class="no-print p-2.5 w-16 text-center bg-slate-200">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-200">
+                ${dailyReports.map((dItem, pIdx) => `
+                  <tr class="hover:bg-slate-50/80 transition ${pIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}">
+                    <td class="p-2 border-r border-slate-200 text-center font-bold text-slate-600 align-top">
+                      ${dItem.no}
+                    </td>
+                    <td class="p-2 border-r border-slate-200 align-top">
+                      <input 
+                        type="text" 
+                        value="${dItem.project}" 
+                        oninput="updateDailyProject(${pIdx}, 'project', this.value)" 
+                        class="w-full bg-transparent font-bold text-teal-800 text-xs py-1 px-1.5 focus:bg-white rounded border border-transparent hover:border-slate-300 focus:border-teal-500" 
+                      />
+                    </td>
+                    <td class="p-2 border-r border-slate-200 align-top">
+                      <div class="space-y-1.5">
+                        ${dItem.actions.map((act, aIdx) => `
+                          <div class="flex items-start gap-1.5 group/act">
+                            <span class="text-teal-600 font-bold mt-1 text-[11px]">•</span>
+                            <textarea 
+                              rows="${Math.max(1, Math.ceil(act.length / 55))}" 
+                              oninput="updateDailyAction(${pIdx}, ${aIdx}, this.value)" 
+                              class="w-full text-xs p-1 bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-teal-500 rounded focus:outline-none transition leading-relaxed text-slate-800"
+                            >${act}</textarea>
+                            <button 
+                              onclick="deleteDailyAction(${pIdx}, ${aIdx})" 
+                              title="刪除此項"
+                              class="no-print text-slate-300 hover:text-rose-600 text-xs px-1 opacity-0 group-hover/act:opacity-100 transition mt-1"
+                            >✕</button>
+                          </div>
+                        `).join('')}
+                        <button 
+                          onclick="addDailyAction(${pIdx})" 
+                          class="no-print text-[11px] text-teal-700 hover:text-teal-900 font-semibold flex items-center gap-1 mt-1 px-1 py-0.5 rounded hover:bg-teal-50 transition"
+                        >
+                          <span>+ 新增事項</span>
+                        </button>
+                      </div>
+                    </td>
+                    <td class="p-2 border-r border-slate-200 text-center align-top">
+                      <select 
+                        onchange="updateDailyProject(${pIdx}, 'risk', this.value)" 
+                        class="text-xs font-bold px-2.5 py-1 rounded-md border focus:outline-none cursor-pointer transition shadow-sm ${
+                          dItem.risk === 'High' ? 'bg-rose-100 text-rose-800 border-rose-400 font-extrabold ring-1 ring-rose-300' :
+                          (dItem.risk === 'Medium' ? 'bg-amber-100 text-amber-800 border-amber-400' :
+                          (dItem.risk === 'Low' ? 'bg-emerald-100 text-emerald-800 border-emerald-400' : 'bg-slate-100 text-slate-700 border-slate-300'))
+                        }"
+                      >
+                        <option value="High" class="bg-rose-100 text-rose-800 font-bold" ${dItem.risk === 'High' ? 'selected' : ''}>High</option>
+                        <option value="Medium" class="bg-amber-100 text-amber-800 font-bold" ${dItem.risk === 'Medium' ? 'selected' : ''}>Medium</option>
+                        <option value="Low" class="bg-emerald-100 text-emerald-800 font-bold" ${dItem.risk === 'Low' ? 'selected' : ''}>Low</option>
+                        <option value="Normal" class="bg-slate-100 text-slate-700" ${dItem.risk === 'Normal' ? 'selected' : ''}>Normal</option>
+                      </select>
+                    </td>
+                    <td class="p-2 border-r border-slate-200 text-center align-top">
+                      <input 
+                        type="text" 
+                        value="${dItem.checkpoint || 'Daily Check'}" 
+                        oninput="updateDailyProject(${pIdx}, 'checkpoint', this.value)" 
+                        class="w-full text-center bg-transparent py-1 px-1 text-xs text-slate-700 font-medium focus:bg-white rounded border border-transparent hover:border-slate-300 focus:border-teal-500" 
+                      />
+                    </td>
+                    <td class="no-print p-2 text-center align-top">
+                      <button 
+                        onclick="deleteDailyProject(${pIdx})" 
+                        title="刪除整個專案項"
+                        class="text-slate-400 hover:text-rose-600 font-bold text-xs p-1 rounded hover:bg-rose-50 transition"
+                      >
+                        刪除
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="bg-slate-50 border-t border-slate-200 px-4 py-2.5 flex items-center justify-between text-xs text-slate-500">
+            <span>Daily Report Dedicated Sheet • 獨立排版與 PDF 匯出</span>
+            <div class="flex items-center gap-2">
+              <button onclick="downloadDailyReportPDF()" class="no-print text-xs text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1">
+                <span>⬇️ 匯出獨立 Daily PDF</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 模組一：總排程主表 (Master Schedule) -->
+        <section id="section-master" class="${viewMode === 'detail' || viewMode === 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div class="p-3 sm:p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
             <div class="flex items-center gap-2">
               <div class="w-2.5 h-4 sm:h-5 bg-teal-600 rounded"></div>
@@ -480,8 +877,8 @@
           </div>
         </section>
 
-        <!-- 模組二：標準單頁週報卡片 -->
-        <section id="section-detail" class="${viewMode === 'master' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border-2 border-teal-800 overflow-hidden">
+        <!-- 模組二：標準單頁週報卡片 (Full Report) -->
+        <section id="section-detail" class="${viewMode === 'master' || viewMode === 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border-2 border-teal-800 overflow-hidden">
           <div class="bg-teal-800 text-white p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
               <span class="bg-white/20 text-white text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded flex-shrink-0">Weekly Report</span>
@@ -505,6 +902,7 @@
           </div>
 
           <div class="p-3 sm:p-4 md:p-6 space-y-4 text-xs">
+            <!-- 1. Stakeholders -->
             <div class="border border-slate-300 rounded-lg overflow-hidden">
               <div class="grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-slate-300">
                 <div class="md:col-span-2 bg-slate-100 font-bold p-2 text-slate-700 flex items-center text-[11px] sm:text-xs">Customer/CM</div>
@@ -520,6 +918,7 @@
               </div>
             </div>
 
+            <!-- 2. Demand & PO/PR 查核矩陣 -->
             <div class="border border-slate-300 rounded-lg overflow-hidden">
               <div class="bg-slate-100 px-3 py-2 font-bold text-slate-800 border-b border-slate-300 flex items-center justify-between text-xs">
                 <span>Demand & PO/PR 查核矩陣</span>
@@ -562,11 +961,13 @@
               </div>
             </div>
 
+            <!-- 3. Schedule 說明 -->
             <div class="border border-slate-300 rounded-lg p-2.5 sm:p-3 bg-slate-50/50">
               <div class="font-bold text-slate-800 mb-1 text-xs">Schedule 時程重點</div>
               <input type="text" value="${curProj.schedule_desc || ''}" placeholder="例如: 需求 11/4 ETA 交付工廠，數量 2 套" onblur="commitField('${curProj.id}', 'schedule_desc', this.value)" class="w-full p-2 bg-white border border-slate-300 rounded focus:ring-1 focus:ring-teal-500 focus:outline-none text-xs" />
             </div>
 
+            <!-- 4. Project Progress (Process 週記日誌) -->
             <div class="border border-slate-300 rounded-lg overflow-hidden">
               <div class="bg-slate-100 px-3 py-2 font-bold text-slate-800 border-b border-slate-300 flex items-center justify-between text-xs">
                 <span>Project Progress (Process 歷程日誌)</span>
@@ -661,7 +1062,11 @@
       saveState();
     }
 
-    function setViewMode(m) { viewMode = m; renderApp(); }
+    function setViewMode(m) { 
+      viewMode = m; 
+      renderApp(); 
+    }
+    
     function selectProject(id) { if (selectedId !== id) { selectedId = id; renderApp(); } }
 
     function addNewProject() {
@@ -716,8 +1121,8 @@
 
     function resetToInitialData() {
       try {
-        localStorage.removeItem('PM_SYSTEM_PROJECTS_V17');
-        localStorage.removeItem('PM_SYSTEM_WEEKS_V17');
+        localStorage.removeItem('PM_SYSTEM_PROJECTS_V19');
+        localStorage.removeItem('PM_SYSTEM_WEEKS_V19');
       } catch (e) {}
       weeks = DEFAULT_WEEKS;
       projects = JSON.parse(JSON.stringify(INITIAL_PROJECTS));
