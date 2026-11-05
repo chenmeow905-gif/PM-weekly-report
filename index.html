@@ -42,8 +42,11 @@
         page-break-inside: avoid !important;
       }
       .rich-editor img {
-        max-width: 280px !important;
-        max-height: 180px !important;
+        max-width: 260px !important;
+        width: auto !important;
+        height: auto !important;
+        max-height: 160px !important;
+        object-fit: contain !important;
         display: inline-block !important;
       }
     }
@@ -74,7 +77,7 @@
       }
     }
 
-    /* 富文字編輯器專屬樣式：支援內嵌圖片與表格呈現 */
+    /* 富文字編輯器樣式：支援貼圖、表格，並強制鎖定圖片長寬比，防止 Outlook 變形 */
     .rich-editor {
       min-height: 48px;
       outline: none;
@@ -101,15 +104,17 @@
       font-weight: bold;
     }
     .rich-editor img {
-      max-width: 100%;
-      max-height: 240px;
+      max-width: 100% !important;
+      width: auto !important;
+      height: auto !important;
+      max-height: 220px !important;
+      object-fit: contain !important;
       border-radius: 6px;
       border: 1px solid #cbd5e1;
       margin: 4px 2px;
       display: inline-block;
       vertical-align: middle;
       box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-      cursor: zoom-in;
     }
   </style>
 </head>
@@ -522,7 +527,7 @@
       } 
     }
 
-    /* ---------------- 全域貼上監聽：支援圖片截圖與 HTML 表格 ---------------- */
+    /* ---------------- 全域貼上監聽：防 Outlook 變形與表格支援 ---------------- */
     function handleRichPaste(e, onSaveCallback) {
       const clipboardData = e.clipboardData || window.clipboardData;
       if (!clipboardData) return;
@@ -550,7 +555,6 @@
       const htmlText = clipboardData.getData('text/html');
       if (htmlText && (htmlText.indexOf('<table') !== -1 || htmlText.indexOf('<tr') !== -1)) {
         e.preventDefault();
-        // 簡易淨化 HTML 表格結構
         const parser = new DOMParser();
         const doc = parser.parseFromString(htmlText, 'text/html');
         const tables = doc.querySelectorAll('table');
@@ -568,12 +572,12 @@
       }
     }
 
+    // 插入圖片：強制鎖定 width: auto; height: auto; object-fit: contain; 防止 Outlook 變形
     function insertImageAtCaret(base64) {
-      const imgHtml = `<img src="${base64}" alt="attachment" style="max-width:100%; max-height:220px; border-radius:6px; margin:4px 0; border:1px solid #cbd5e1;" />`;
+      const imgHtml = `<img src="${base64}" alt="attachment" style="max-width:100% !important; width:auto !important; height:auto !important; max-height:220px !important; object-fit:contain !important; border-radius:6px; margin:4px 0; border:1px solid #cbd5e1;" />`;
       document.execCommand('insertHTML', false, imgHtml);
     }
 
-    /* ---------------- 通用圖片上傳觸發 ---------------- */
     let currentUploadCallback = null;
     function triggerImageUpload(callback) {
       currentUploadCallback = callback;
@@ -719,7 +723,6 @@
       saveState();
     }
 
-    /* ---------------- 更新 Daily Action（支援 HTML 富文字） ---------------- */
     function updateDailyActionHTML(projIdx, actIdx, htmlVal) {
       dailyReports[projIdx].actions[actIdx] = htmlVal;
       saveState();
@@ -727,7 +730,7 @@
 
     function appendImageToDailyAction(projIdx, actIdx, base64) {
       const curContent = dailyReports[projIdx].actions[actIdx] || '';
-      const imgTag = `<br><img src="${base64}" alt="attachment" style="max-width:100%; max-height:220px; border-radius:6px; margin:4px 0; border:1px solid #cbd5e1;" />`;
+      const imgTag = `<br><img src="${base64}" alt="attachment" style="max-width:100% !important; width:auto !important; height:auto !important; max-height:220px !important; object-fit:contain !important; border-radius:6px; margin:4px 0; border:1px solid #cbd5e1;" />`;
       dailyReports[projIdx].actions[actIdx] = curContent + imgTag;
       saveState();
       renderApp();
@@ -775,7 +778,7 @@
       }
     }
 
-    // 取得指定專案的「重要 WK 里程碑」（過濾空值，只顯示重點標籤）
+    // 取得指定專案的「重要 WK 里程碑」
     function getProjectKeyMilestonesHTML(proj) {
       if (!proj || !proj.milestones) return '<span style="color:#64748b; font-size:11px;">依排程進行中</span>';
       const pills = [];
@@ -1084,6 +1087,63 @@
       }
     }
 
+    /* ---------------- 全新：導出 Excel (表格化) 原生實作 ---------------- */
+    function downloadTableAsExcel(htmlContent, filename) {
+      const excelTemplate = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta charset="utf-8">
+          <!--[if gte mso 9]>
+          <xml>
+            <x:ExcelWorkbook>
+              <x:ExcelWorksheets>
+                <x:ExcelWorksheet>
+                  <x:Name>Sheet1</x:Name>
+                  <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+                </x:ExcelWorksheet>
+              </x:ExcelWorksheets>
+            </x:ExcelWorkbook>
+          </xml>
+          <![endif]-->
+          <style>
+            table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
+            th, td { border: 0.5pt solid #cbd5e1; padding: 6px 10px; }
+            th { background-color: #0f766e; color: #ffffff; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          ${htmlContent}
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob(['\uFEFF' + excelTemplate], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 150);
+    }
+
+    // 週報導出 Excel
+    function exportWeeklyReportExcel() {
+      const reportHtml = generateCleanReportHTML();
+      const fileName = `PM_Weekly_Report_${currentTeam || 'Group'}_${weeklyReportDate}.xls`;
+      downloadTableAsExcel(reportHtml, fileName);
+    }
+
+    // 日報導出 Excel
+    function exportDailyReportExcel() {
+      const reportHtml = generateDailyReportPrintHTML();
+      const fileName = `Daily_Report_${currentTeam || 'Group'}_${dailyReportDate}.xls`;
+      downloadTableAsExcel(reportHtml, fileName);
+    }
+
     function openDedicatedPrintWindow() {
       const reportHtml = generateCleanReportHTML();
       const printWindow = window.open('', '_blank', 'width=1150,height=850');
@@ -1194,7 +1254,7 @@
       const proj = projects.find(p => p.id === projId);
       if (!proj) return;
       const curContent = proj[field] || '';
-      const imgTag = `<br><img src="${base64}" alt="attachment" style="max-width:100%; max-height:220px; border-radius:6px; margin:4px 0; border:1px solid #cbd5e1;" />`;
+      const imgTag = `<br><img src="${base64}" alt="attachment" style="max-width:100% !important; width:auto !important; height:auto !important; max-height:220px !important; object-fit:contain !important; border-radius:6px; margin:4px 0; border:1px solid #cbd5e1;" />`;
       commitField(projId, field, curContent + imgTag);
       renderApp();
     }
@@ -1216,7 +1276,7 @@
       const log = (proj.progress_logs || []).find(l => l.id === logId);
       if (!log) return;
       const curContent = log.content || '';
-      const imgTag = `<br><img src="${base64}" alt="attachment" style="max-width:100%; max-height:220px; border-radius:6px; margin:4px 0; border:1px solid #cbd5e1;" />`;
+      const imgTag = `<br><img src="${base64}" alt="attachment" style="max-width:100% !important; width:auto !important; height:auto !important; max-height:220px !important; object-fit:contain !important; border-radius:6px; margin:4px 0; border:1px solid #cbd5e1;" />`;
       commitLogHTML(projId, logId, curContent + imgTag);
       renderApp();
     }
@@ -1373,10 +1433,6 @@
       saveState();
     }
 
-    function commitFieldDirect(projId, field, val) {
-      commitField(projId, field, val);
-    }
-
     function renderApp() {
       if (!checkAuth()) return;
       const scrollContainer = document.getElementById('masterScrollContainer');
@@ -1433,11 +1489,13 @@
               ${viewMode === 'daily' ? `
                 <button type="button" onclick="addDailyProject()" class="bg-teal-700 hover:bg-teal-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition">+ 新增專案項</button>
                 <button type="button" onclick="downloadDailyReportPDF()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-1"><span>📄</span><span>匯出 Daily PDF</span></button>
+                <button type="button" onclick="exportDailyReportExcel()" class="bg-sky-700 hover:bg-sky-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-1"><span>📊</span><span>匯出 Daily Excel</span></button>
                 <button type="button" onclick="printDailyReportWindow()" class="bg-slate-800 hover:bg-slate-900 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition hidden sm:inline-block">列印日報</button>
                 <button type="button" onclick="resetDailyReport()" class="text-[11px] sm:text-xs text-rose-600 hover:bg-rose-50 px-2 py-1.5 rounded-lg transition">還原日報範本</button>
               ` : `
                 <button type="button" onclick="addNewProject()" class="bg-teal-700 hover:bg-teal-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition">+ 治具</button>
                 <button type="button" onclick="downloadWeeklyReportPDF()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-1"><span>📄</span><span>匯出 PDF</span></button>
+                <button type="button" onclick="exportWeeklyReportExcel()" class="bg-sky-700 hover:bg-sky-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-1"><span>📊</span><span>匯出 Excel</span></button>
                 <button type="button" onclick="openDedicatedPrintWindow()" class="bg-slate-800 hover:bg-slate-900 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition hidden sm:inline-block">列印週報</button>
                 <button type="button" onclick="resetToInitialData()" class="text-[11px] sm:text-xs text-rose-600 hover:bg-rose-50 px-2 py-1.5 rounded-lg transition">恢復報告資訊</button>
               `}
@@ -1465,7 +1523,7 @@
             </div>
           </div>
         ` : `
-          <!-- 模組三：Daily Report (已升級支援圖片截圖貼上、Excel表格與附件上傳) -->
+          <!-- 模組三：Daily Report (已支援圖片截圖貼上、Excel表格與附件上傳) -->
           <section id="section-daily" class="${viewMode !== 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border-2 border-teal-700 overflow-hidden">
             <div class="p-3 sm:p-4 bg-teal-800 text-white flex flex-wrap items-center justify-between gap-3">
               <div class="flex items-center gap-3">
@@ -1518,7 +1576,7 @@
                               >${act}</div>
                               <div class="no-print flex items-center gap-1 opacity-0 group-hover/act:opacity-100 transition mt-1 flex-shrink-0">
                                 <button 
-                                  type="button"
+                                  type="button" 
                                   title="點擊上傳圖片附件"
                                   onclick="triggerImageUpload((b64) => appendImageToDailyAction(${pIdx}, ${aIdx}, b64))"
                                   class="text-teal-600 hover:text-teal-800 text-xs px-1 hover:bg-teal-50 rounded"
@@ -1581,10 +1639,13 @@
             </div>
 
             <div class="bg-slate-50 border-t border-slate-200 px-4 py-2.5 flex items-center justify-between text-xs text-slate-500">
-              <span>Daily Report Dedicated Sheet • ${currentTeam} 獨立排版與 PDF 匯出（已支援圖表貼上）</span>
+              <span>Daily Report Dedicated Sheet • ${currentTeam} 獨立排版與 PDF/Excel 匯出</span>
               <div class="flex items-center gap-2">
                 <button type="button" onclick="downloadDailyReportPDF()" class="no-print text-xs text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1">
                   <span>📄 匯出 Daily PDF</span>
+                </button>
+                <button type="button" onclick="exportDailyReportExcel()" class="no-print text-xs text-sky-700 hover:text-sky-900 font-bold flex items-center gap-1">
+                  <span>📊 匯出 Daily Excel</span>
                 </button>
               </div>
             </div>
@@ -1727,7 +1788,7 @@
             </div>
           </section>
 
-          <!-- 模組二：標準單頁週報卡片 (Full Report，已升級支援貼上圖片、Excel表格與附件上傳) -->
+          <!-- 模組二：標準單頁週報卡片 (Full Report，支援貼圖、表格與防變形) -->
           <section id="section-detail" class="${viewMode === 'master' || viewMode === 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border-2 border-teal-800 overflow-hidden">
             <div class="bg-teal-800 text-white p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -1826,7 +1887,7 @@
                 <input type="text" value="${curProj.schedule_desc || ''}" placeholder="例如: 需求 11/4 ETA 交付工廠，數量 2 套" onblur="commitField('${curProj.id}', 'schedule_desc', this.value)" class="w-full p-2 bg-white border border-slate-300 rounded focus:ring-1 focus:ring-teal-500 focus:outline-none text-xs" />
               </div>
 
-              <!-- 4. Project Progress (Process 週記日誌：支援截圖貼圖、貼上表格、點擊上傳圖檔) -->
+              <!-- 4. Project Progress (Process 週記日誌) -->
               <div class="border border-slate-300 rounded-lg overflow-hidden">
                 <div class="bg-slate-100 px-3 py-2 font-bold text-slate-800 border-b border-slate-300 flex items-center justify-between text-xs">
                   <span>Project Progress (Process 歷程日誌，支援直接貼上截圖與表格)</span>
@@ -1862,7 +1923,7 @@
                 </div>
               </div>
 
-              <!-- Special Issue 與 To-do plan（支援截圖貼圖與上傳） -->
+              <!-- Special Issue 與 To-do plan -->
               <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 <div class="border border-amber-300 bg-amber-50/30 rounded-lg p-2.5 sm:p-3">
                   <div class="flex items-center justify-between mb-1.5">
