@@ -10,8 +10,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     @page {
-      size: A4 landscape;
-      margin: 8mm 6mm;
+      size: A4 portrait;
+      margin: 10mm 8mm;
     }
     @media print {
       .no-print, #loginOverlay, #cellColorPalette {
@@ -22,7 +22,7 @@
         color: #0f172a !important;
         padding: 0 !important;
         margin: 0 !important;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft JhengHei", sans-serif !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
@@ -42,10 +42,10 @@
         page-break-inside: avoid !important;
       }
       .rich-editor img {
-        max-width: 260px !important;
+        max-width: 280px !important;
         width: auto !important;
         height: auto !important;
-        max-height: 160px !important;
+        max-height: 180px !important;
         object-fit: contain !important;
         display: inline-block !important;
       }
@@ -60,29 +60,13 @@
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-    @media (max-width: 1024px) {
-      .sticky-col-1 {
-        position: sticky;
-        left: 0;
-        z-index: 10;
-        background-color: #f8fafc;
-        box-shadow: 2px 0 4px -1px rgba(0,0,0,0.06);
-      }
-      .sticky-col-header {
-        position: sticky;
-        left: 0;
-        z-index: 30;
-        background-color: #e2e8f0;
-        box-shadow: 2px 0 4px -1px rgba(0,0,0,0.08);
-      }
-    }
-
-    /* 富文字編輯器樣式：支援貼圖、表格，並強制鎖定圖片長寬比，防止 Outlook 變形 */
+    /* 富文字編輯器樣式：鎖定長寬比防止 Outlook 貼圖變形 */
     .rich-editor {
       min-height: 48px;
       outline: none;
       word-break: break-word;
       white-space: pre-wrap;
+      font-size: 12pt;
     }
     .rich-editor:empty:before {
       content: attr(placeholder);
@@ -93,11 +77,11 @@
       border-collapse: collapse;
       width: 100%;
       margin: 6px 0;
-      font-size: 11px;
+      font-size: 12pt;
     }
     .rich-editor table, .rich-editor th, .rich-editor td {
       border: 1px solid #cbd5e1;
-      padding: 4px 6px;
+      padding: 6px 8px;
     }
     .rich-editor th {
       background-color: #f1f5f9;
@@ -116,14 +100,35 @@
       vertical-align: middle;
       box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
+
+    /* 郵件直向複製專用容器（字體 12pt，相容 Outlook） */
+    .email-container {
+      font-size: 12pt !important;
+      font-family: Calibri, Arial, "Microsoft JhengHei", sans-serif !important;
+      line-height: 1.5 !important;
+      color: #1e293b !important;
+    }
+    .email-container table {
+      font-size: 12pt !important;
+      border-collapse: collapse !important;
+      width: 100% !important;
+    }
+    .email-container th, .email-container td {
+      border: 1px solid #94a3b8 !important;
+      padding: 6px 10px !important;
+      font-size: 12pt !important;
+    }
+    .email-container th {
+      background-color: #0f766e !important;
+      color: #ffffff !important;
+    }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen antialiased">
 
-  <!-- 隱藏的通用圖檔上傳 input -->
   <input type="file" id="globalImageUploader" accept="image/*" class="hidden" onchange="handleFileSelected(event)" />
 
-  <!-- 1. 獨立純 CSS 登入遮罩（層級 99999） -->
+  <!-- 登入遮罩 -->
   <div id="loginOverlay" style="position: fixed; inset: 0; z-index: 99999; display: flex; align-items: center; justify-content: center; background-color: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); padding: 16px; pointer-events: auto;">
     <div style="background: #ffffff; width: 100%; max-width: 420px; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4); border: 1px solid #e2e8f0; overflow: hidden; pointer-events: auto;">
       <div style="background-color: #0f766e; padding: 24px; text-align: center; color: white;">
@@ -172,38 +177,20 @@
   <!-- 主系統容器 -->
   <div id="app" class="w-full flex flex-col p-2 sm:p-4 md:p-6 max-w-[1700px] mx-auto gap-4 sm:gap-6"></div>
 
-  <!-- 浮動調色盤 -->
-  <div id="cellColorPalette" class="hidden fixed z-50 bg-white border border-slate-300 rounded-xl shadow-2xl p-3 w-72 text-xs transition-all">
-    <div class="flex items-center justify-between border-b border-slate-200 pb-2 mb-2.5">
-      <div class="font-bold text-slate-800 flex items-center gap-1.5">
-        <span>🎨</span><span>設定醒目標示與文字顏色</span>
+  <!-- 郵件直向複製彈窗 -->
+  <div id="emailCopyModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="p-3 sm:p-4 bg-teal-800 text-white flex items-center justify-between">
+        <div>
+          <span class="font-bold text-base">直向郵件格式預覽（字體 12pt • 甘特圖）</span>
+          <p class="text-xs text-teal-200 mt-0.5">點擊「複製郵件內容」後即可直接貼入 Outlook / Gmail</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="copyEmailHTMLToClipboard()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold shadow">📋 複製郵件內容</button>
+          <button type="button" onclick="closeEmailCopyModal()" class="text-white/80 hover:text-white text-lg font-bold px-2">✕</button>
+        </div>
       </div>
-      <button onclick="closeColorPalette()" class="text-slate-400 hover:text-slate-700 font-bold px-1 text-sm">✕</button>
-    </div>
-    <div class="mb-3">
-      <div class="text-[11px] font-semibold text-slate-500 mb-1.5">快速醒目預設 (底色 + 字色)：</div>
-      <div class="grid grid-cols-3 gap-1.5 text-center">
-        <button onclick="applyPresetColor('#dbeafe', '#1e40af')" class="p-1 rounded bg-blue-100 text-blue-800 font-bold border border-blue-200">藍色 (需求/DFM)</button>
-        <button onclick="applyPresetColor('#fef3c7', '#92400e')" class="p-1 rounded bg-amber-100 text-amber-800 font-bold border border-amber-200">黃色 (採購/備料)</button>
-        <button onclick="applyPresetColor('#ffedd5', '#9a3412')" class="p-1 rounded bg-orange-100 text-orange-800 font-bold border border-orange-200">橙色 (組裝/調適)</button>
-        <button onclick="applyPresetColor('#d1fae5', '#065f46')" class="p-1 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">綠色 (完成/Pass)</button>
-        <button onclick="applyPresetColor('#ffe4e6', '#9f1239')" class="p-1 rounded bg-rose-100 text-rose-800 font-bold border border-rose-200">紅色 (延遲/異常)</button>
-        <button onclick="applyPresetColor('#f3e8ff', '#6b21a8')" class="p-1 rounded bg-purple-100 text-purple-800 font-bold border border-purple-200">紫色 (KO/BOM)</button>
-      </div>
-    </div>
-    <div class="space-y-2 border-t border-slate-200 pt-2.5">
-      <div class="flex items-center justify-between">
-        <span class="text-slate-600 font-medium">自訂醒目底色:</span>
-        <input type="color" id="pickerBg" onchange="applyCustomBg(this.value)" class="w-8 h-6 rounded cursor-pointer border border-slate-300" />
-      </div>
-      <div class="flex items-center justify-between">
-        <span class="text-slate-600 font-medium">自訂文字顏色:</span>
-        <input type="color" id="pickerText" onchange="applyCustomText(this.value)" class="w-8 h-6 rounded cursor-pointer border border-slate-300" />
-      </div>
-    </div>
-    <div class="border-t border-slate-200 pt-2.5 mt-2.5 flex items-center justify-between">
-      <button onclick="clearCustomColor()" class="text-rose-600 hover:text-rose-800 font-medium text-[11px]">🔄 清除顏色 (預設)</button>
-      <button onclick="closeColorPalette()" class="bg-teal-700 hover:bg-teal-800 text-white font-medium px-2.5 py-1 rounded text-xs">完成</button>
+      <div class="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-50 touch-scroll" id="emailModalBody"></div>
     </div>
   </div>
 
@@ -270,28 +257,13 @@
     currentTeam = currentTeam.replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, '').trim();
 
     const DEFAULT_WEEKS = [
-      { "id": "w1", "week": "WK32", "month": "Aug-26", "date": "8/3" },
-      { "id": "w2", "week": "WK33", "month": "Aug-26", "date": "8/10" },
-      { "id": "w3", "week": "WK34", "month": "Aug-26", "date": "8/17" },
-      { "id": "w4", "week": "WK35", "month": "Aug-26", "date": "8/24" },
-      { "id": "w5", "week": "WK36", "month": "Aug-26", "date": "8/31" },
-      { "id": "w6", "week": "WK37", "month": "Sep-26", "date": "9/7" },
-      { "id": "w7", "week": "WK38", "month": "Sep-26", "date": "9/14" },
-      { "id": "w8", "week": "WK39", "month": "Sep-26", "date": "9/21" },
-      { "id": "w9", "week": "WK40", "month": "Sep-26", "date": "9/28" },
-      { "id": "w10", "week": "WK41", "month": "Oct-26", "date": "10/5" },
       { "id": "w11", "week": "WK42", "month": "Oct-26", "date": "10/12" },
       { "id": "w12", "week": "WK43", "month": "Oct-26", "date": "10/19" },
       { "id": "w13", "week": "WK44", "month": "Oct-26", "date": "10/26" },
       { "id": "w14", "week": "WK45", "month": "Nov-26", "date": "11/2" },
       { "id": "w15", "week": "WK46", "month": "Nov-26", "date": "11/9" },
       { "id": "w16", "week": "WK47", "month": "Nov-26", "date": "11/16" },
-      { "id": "w17", "week": "WK48", "month": "Nov-26", "date": "11/23" },
-      { "id": "w18", "week": "WK49", "month": "Nov-26", "date": "11/30" },
-      { "id": "w19", "week": "WK50", "month": "Dec-26", "date": "12/7" },
-      { "id": "w20", "week": "WK51", "month": "Dec-26", "date": "12/14" },
-      { "id": "w21", "week": "WK52", "month": "Dec-26", "date": "12/21" },
-      { "id": "w22", "week": "WK53", "month": "Dec-26", "date": "12/28" }
+      { "id": "w17", "week": "WK48", "month": "Nov-26", "date": "11/23" }
     ];
 
     const JANE_INITIAL_PROJECTS = [
@@ -455,25 +427,13 @@
 
       try {
         const storedProj = localStorage.getItem(STORAGE_KEY_PROJ);
-        if (storedProj) {
-          projects = JSON.parse(storedProj);
-        } else {
-          projects = (currentTeam === 'Jane') ? JSON.parse(JSON.stringify(JANE_INITIAL_PROJECTS)) : createBlankProject();
-        }
+        projects = storedProj ? JSON.parse(storedProj) : ((currentTeam === 'Jane') ? JSON.parse(JSON.stringify(JANE_INITIAL_PROJECTS)) : createBlankProject());
 
         const storedWeeks = localStorage.getItem(STORAGE_KEY_WEEK);
-        if (storedWeeks) {
-          weeks = JSON.parse(storedWeeks);
-        } else {
-          weeks = DEFAULT_WEEKS;
-        }
+        weeks = storedWeeks ? JSON.parse(storedWeeks) : DEFAULT_WEEKS;
 
         const storedDaily = localStorage.getItem(STORAGE_KEY_DAILY);
-        if (storedDaily) {
-          dailyReports = JSON.parse(storedDaily);
-        } else {
-          dailyReports = (currentTeam === 'Jane') ? JSON.parse(JSON.stringify(JANE_INITIAL_DAILY)) : createBlankDaily();
-        }
+        dailyReports = storedDaily ? JSON.parse(storedDaily) : ((currentTeam === 'Jane') ? JSON.parse(JSON.stringify(JANE_INITIAL_DAILY)) : createBlankDaily());
 
         const storedDailyDate = localStorage.getItem(STORAGE_KEY_DAILY_DATE);
         if (storedDailyDate) dailyReportDate = storedDailyDate;
@@ -510,9 +470,7 @@
 
     function promptNewTeam() {
       const input = prompt('請輸入新組別名稱 (例如: NPI, Automation, Peter):', '');
-      if (input && input.trim()) {
-        switchTeam(input.trim());
-      }
+      if (input && input.trim()) switchTeam(input.trim());
     }
 
     function setViewMode(m) { 
@@ -532,7 +490,6 @@
       const clipboardData = e.clipboardData || window.clipboardData;
       if (!clipboardData) return;
 
-      // 1. 若剪貼簿含有圖檔（例如螢幕截圖 Ctrl+V / Cmd+V）
       if (clipboardData.items) {
         for (let i = 0; i < clipboardData.items.length; i++) {
           const item = clipboardData.items[i];
@@ -541,8 +498,7 @@
             const blob = item.getAsFile();
             const reader = new FileReader();
             reader.onload = function(evt) {
-              const base64Img = evt.target.result;
-              insertImageAtCaret(base64Img);
+              insertImageAtCaret(evt.target.result);
               if (onSaveCallback) onSaveCallback();
             };
             reader.readAsDataURL(blob);
@@ -551,7 +507,6 @@
         }
       }
 
-      // 2. 若剪貼簿含有 Excel / 網頁 HTML 表格
       const htmlText = clipboardData.getData('text/html');
       if (htmlText && (htmlText.indexOf('<table') !== -1 || htmlText.indexOf('<tr') !== -1)) {
         e.preventDefault();
@@ -572,7 +527,6 @@
       }
     }
 
-    // 插入圖片：強制鎖定 width: auto; height: auto; object-fit: contain; 防止 Outlook 變形
     function insertImageAtCaret(base64) {
       const imgHtml = `<img src="${base64}" alt="attachment" style="max-width:100% !important; width:auto !important; height:auto !important; max-height:220px !important; object-fit:contain !important; border-radius:6px; margin:4px 0; border:1px solid #cbd5e1;" />`;
       document.execCommand('insertHTML', false, imgHtml);
@@ -591,120 +545,9 @@
       if (!file) return;
       const reader = new FileReader();
       reader.onload = function(evt) {
-        const base64 = evt.target.result;
-        if (currentUploadCallback) {
-          currentUploadCallback(base64);
-        }
+        if (currentUploadCallback) currentUploadCallback(evt.target.result);
       };
       reader.readAsDataURL(file);
-    }
-
-    // 調色盤邏輯
-    let activePaletteTarget = null;
-    function openColorPalette(projId, weekId, btnEl) {
-      const proj = projects.find(p => p.id === projId);
-      const mItem = (proj && proj.milestones && proj.milestones[weekId]) || '';
-      const curBg = (typeof mItem === 'object' && mItem.bg) ? mItem.bg : '#ffffff';
-      const curColor = (typeof mItem === 'object' && mItem.color) ? mItem.color : '#0f172a';
-      const inputEl = btnEl.parentElement.querySelector('input');
-      activePaletteTarget = { projId, weekId, inputEl };
-
-      document.getElementById('pickerBg').value = curBg.startsWith('#') ? curBg : '#dbeafe';
-      document.getElementById('pickerText').value = curColor.startsWith('#') ? curColor : '#1e40af';
-
-      const palette = document.getElementById('cellColorPalette');
-      palette.classList.remove('hidden');
-
-      const rect = btnEl.getBoundingClientRect();
-      let left = rect.left + window.scrollX - 260;
-      if (left < 10) left = 10;
-      let top = rect.bottom + window.scrollY + 6;
-      if (top + 280 > window.innerHeight + window.scrollY) {
-        top = rect.top + window.scrollY - 280;
-      }
-      palette.style.left = `${left}px`;
-      palette.style.top = `${top}px`;
-    }
-
-    function closeColorPalette() {
-      document.getElementById('cellColorPalette').classList.add('hidden');
-      activePaletteTarget = null;
-    }
-
-    function applyPresetColor(bgColor, textColor) {
-      if (!activePaletteTarget) return;
-      const { projId, weekId, inputEl } = activePaletteTarget;
-      updateMilestoneColor(projId, weekId, inputEl, bgColor, textColor);
-      document.getElementById('pickerBg').value = bgColor;
-      document.getElementById('pickerText').value = textColor;
-    }
-
-    function applyCustomBg(bgColor) {
-      if (!activePaletteTarget) return;
-      const { projId, weekId, inputEl } = activePaletteTarget;
-      const curColor = inputEl.style.color || '#0f172a';
-      updateMilestoneColor(projId, weekId, inputEl, bgColor, curColor);
-    }
-
-    function applyCustomText(textColor) {
-      if (!activePaletteTarget) return;
-      const { projId, weekId, inputEl } = activePaletteTarget;
-      const curBg = inputEl.style.backgroundColor || '#ffffff';
-      updateMilestoneColor(projId, weekId, inputEl, curBg, textColor);
-    }
-
-    function clearCustomColor() {
-      if (!activePaletteTarget) return;
-      const { projId, weekId, inputEl } = activePaletteTarget;
-      const proj = projects.find(p => p.id === projId);
-      const mItem = (proj && proj.milestones && proj.milestones[weekId]) || '';
-      const textVal = typeof mItem === 'object' ? (mItem.text || '') : mItem;
-      projects = projects.map(p => {
-        if (p.id !== projId) return p;
-        return { ...p, milestones: { ...(p.milestones || {}), [weekId]: textVal } };
-      });
-      saveState();
-      inputEl.style.backgroundColor = '';
-      inputEl.style.color = '';
-      inputEl.className = "w-full text-center text-[10px] leading-tight py-1 pr-3 focus:bg-white rounded font-medium";
-      liveColorBadge(inputEl);
-      closeColorPalette();
-    }
-
-    function updateMilestoneColor(projId, weekId, inputEl, bg, color) {
-      const val = inputEl.value;
-      projects = projects.map(p => {
-        if (p.id !== projId) return p;
-        return {
-          ...p,
-          milestones: { ...(p.milestones || {}), [weekId]: { text: val, bg: bg, color: color } }
-        };
-      });
-      saveState();
-      inputEl.className = "w-full text-center text-[10px] leading-tight py-1 pr-3 rounded font-bold";
-      inputEl.style.backgroundColor = bg;
-      inputEl.style.color = color;
-    }
-
-    function getMonthGroups() {
-      if (!weeks || weeks.length === 0) return [];
-      const groups = [];
-      let curMonth = weeks[0].month || 'Month';
-      let span = 0;
-      weeks.forEach((w, idx) => {
-        const m = w.month || 'Month';
-        if (m === curMonth) {
-          span++;
-        } else {
-          groups.push({ month: curMonth, span });
-          curMonth = m;
-          span = 1;
-        }
-        if (idx === weeks.length - 1) {
-          groups.push({ month: curMonth, span });
-        }
-      });
-      return groups;
     }
 
     function updateWeeklyDate(val) {
@@ -778,313 +621,209 @@
       }
     }
 
-    // 取得指定專案的「重要 WK 里程碑」
-    function getProjectKeyMilestonesHTML(proj) {
-      if (!proj || !proj.milestones) return '<span style="color:#64748b; font-size:11px;">依排程進行中</span>';
-      const pills = [];
-      (weeks || []).forEach(w => {
-        const m = proj.milestones[w.id];
-        if (!m) return;
-        const textVal = typeof m === 'object' ? (m.text || '') : m;
-        if (textVal && textVal.trim() !== '' && textVal.trim() !== '-') {
-          const bg = (typeof m === 'object' && m.bg) ? m.bg : '#dbeafe';
-          const col = (typeof m === 'object' && m.color) ? m.color : '#1e40af';
-          pills.push(`
-            <span style="display:inline-block; background-color:${bg}; color:${col}; padding:2px 7px; border-radius:4px; font-weight:bold; font-size:10.5px; margin:2px 3px; border:1px solid rgba(0,0,0,0.08);">
-              ${w.week} (${w.date}): ${textVal}
-            </span>
-          `);
-        }
-      });
-      return pills.length > 0 ? pills.join('') : '<span style="color:#64748b; font-size:11px;">依排程推進中</span>';
+    /* ---------------- WK 甘特圖生成函式（適合直接貼入郵件） ---------------- */
+    function generateGanttChartHTML(proj) {
+      if (!proj) return '';
+      const weekCols = weeks.map(w => {
+        const m = (proj.milestones && proj.milestones[w.id]);
+        const textVal = m ? (typeof m === 'object' ? m.text : m) : '';
+        const hasTask = textVal && textVal.trim() !== '' && textVal.trim() !== '-';
+        return `
+          <td style="width: 14%; border: 1px solid #cbd5e1; padding: 4px; text-align: center; vertical-align: top; background: ${hasTask ? '#f0fdfa' : '#ffffff'};">
+            <div style="font-size: 11pt; font-weight: bold; color: #475569; margin-bottom: 2px;">${w.week}</div>
+            <div style="font-size: 10pt; color: #94a3b8; margin-bottom: 4px;">${w.date}</div>
+            ${hasTask ? `
+              <div style="background-color: #0f766e; color: #ffffff; border-radius: 4px; padding: 4px 6px; font-size: 11pt; font-weight: bold; line-height: 1.3;">
+                ${textVal}
+              </div>
+            ` : `
+              <div style="height: 6px; background-color: #e2e8f0; border-radius: 3px; margin-top: 12px;"></div>
+            `}
+          </td>
+        `;
+      }).join('');
+
+      return `
+        <table style="width: 100%; border-collapse: collapse; font-size: 12pt; margin: 8px 0; background: #ffffff;">
+          <thead>
+            <tr style="background-color: #f1f5f9; color: #1e293b;">
+              <th colspan="${weeks.length}" style="border: 1px solid #cbd5e1; padding: 6px 10px; font-size: 12pt; text-align: left; background-color: #e2e8f0; color: #0f766e; font-weight: bold;">
+                📊 WK 週次時程甘特圖 (Gantt Chart)
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>${weekCols}</tr>
+          </tbody>
+        </table>
+      `;
     }
 
-    // 生成緊湊、自動自適應 A4 橫向的正式報表 HTML
-    function generateCleanReportHTML() {
+    /* ---------------- 生成直向 12pt 郵件排版 HTML ---------------- */
+    function generateEmailPortraitHTML() {
       const curProj = (projects && projects.length > 0) ? (projects.find(p => p.id === selectedId) || projects[0]) : {};
-      return `
-        <div id="cleanReportContainer" style="width: 1040px; margin: 0 auto; background: #ffffff; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px; box-sizing: border-box;">
-          
-          <!-- 第一頁：Master Schedule 專案時程總排程重點版 -->
-          <div style="page-break-after: always; break-after: page; padding-bottom: 16px;">
-            <div style="border-bottom: 2px solid #0f766e; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-end;">
-              <div>
-                <h1 style="font-size: 20px; font-weight: bold; color: #0f766e; margin: 0; display: flex; align-items: center; gap: 8px;">
-                  <span>PM weekly report — 專案時程總排程</span>
-                  <span style="font-size: 11px; background: #ccfbf1; color: #0f766e; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${currentTeam}</span>
-                </h1>
-                <p style="font-size: 11px; color: #64748b; margin: 3px 0 0 0;">重點排程彙整（Master Schedule Overview & Key Milestones）</p>
-              </div>
-              <div style="font-size: 11px; color: #334155; font-weight: bold;">報告日期: ${weeklyReportDate}</div>
+
+      if (viewMode === 'daily') {
+        return `
+          <div class="email-container" style="max-width: 720px; margin: 0 auto; background: #ffffff; padding: 12px; font-family: Calibri, Arial, 'Microsoft JhengHei', sans-serif; font-size: 12pt; color: #1e293b;">
+            <div style="border-bottom: 3px solid #0f766e; padding-bottom: 8px; margin-bottom: 12px;">
+              <h2 style="font-size: 16pt; font-weight: bold; color: #0f766e; margin: 0;">Daily Report (${currentTeam})</h2>
+              <div style="font-size: 11pt; color: #64748b; margin-top: 4px;">報告日期: ${dailyReportDate}</div>
             </div>
 
-            <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; margin-bottom: 12px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 12pt;">
               <thead>
-                <tr style="background: #f1f5f9; color: #1e293b; border-top: 1px solid #cbd5e1; border-bottom: 2px solid #0f766e;">
-                  <th style="padding: 7px 8px; border: 1px solid #cbd5e1; width: 75px; text-align: center;">專案</th>
-                  <th style="padding: 7px 6px; border: 1px solid #cbd5e1; width: 45px; text-align: center;">位置</th>
-                  <th style="padding: 7px 8px; border: 1px solid #cbd5e1; width: 95px;">CM工廠</th>
-                  <th style="padding: 7px 6px; border: 1px solid #cbd5e1; width: 55px; text-align: center;">階段</th>
-                  <th style="padding: 7px 10px; border: 1px solid #cbd5e1; width: 220px;">治具名稱 (Fixture)</th>
-                  <th style="padding: 7px 6px; border: 1px solid #cbd5e1; width: 60px; text-align: center;">狀態</th>
-                  <th style="padding: 7px 6px; border: 1px solid #cbd5e1; width: 75px; text-align: center;">交期</th>
-                  <th style="padding: 7px 8px; border: 1px solid #cbd5e1; width: 65px; text-align: center;">PM</th>
-                  <th style="padding: 7px 8px; border: 1px solid #cbd5e1; width: 85px; text-align: center;">RD/ME</th>
-                  <th style="padding: 7px 10px; border: 1px solid #cbd5e1;">關鍵進度與里程碑摘要 (Key Milestones)</th>
+                <tr style="background-color: #0f766e; color: #ffffff;">
+                  <th style="border: 1px solid #94a3b8; padding: 6px 8px; width: 45px; text-align: center;">No.</th>
+                  <th style="border: 1px solid #94a3b8; padding: 6px 10px; width: 140px;">專案</th>
+                  <th style="border: 1px solid #94a3b8; padding: 6px 10px;">重點方針與行動 (Highlights / Actions)</th>
+                  <th style="border: 1px solid #94a3b8; padding: 6px 8px; width: 90px; text-align: center;">風險等級</th>
+                  <th style="border: 1px solid #94a3b8; padding: 6px 8px; width: 95px; text-align: center;">查核點</th>
                 </tr>
               </thead>
               <tbody>
-                ${(projects || []).map((p, idx) => `
-                  <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; border-bottom: 1px solid #cbd5e1;">
-                    <td style="padding: 7px 8px; border: 1px solid #cbd5e1; font-weight: bold; color: #0f766e; text-align: center;">${p.project || '-'}</td>
-                    <td style="padding: 7px 6px; border: 1px solid #cbd5e1; text-align: center;">${p.location || '-'}</td>
-                    <td style="padding: 7px 8px; border: 1px solid #cbd5e1;">${p.cm || '-'}</td>
-                    <td style="padding: 7px 6px; border: 1px solid #cbd5e1; font-weight: bold; color: #0284c7; text-align: center;">${p.phase || '-'}</td>
-                    <td style="padding: 7px 10px; border: 1px solid #cbd5e1; font-weight: bold; color: #0f172a;">${p.fixture || '-'}</td>
-                    <td style="padding: 7px 6px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold; color: ${
-                      p.status === '完成' ? '#047857' : (p.status === '組裝' ? '#b45309' : '#0284c7')
-                    };">${p.status || '-'}</td>
-                    <td style="padding: 7px 6px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold; color: #be123c;">${p.deadline || '-'}</td>
-                    <td style="padding: 7px 8px; border: 1px solid #cbd5e1; text-align: center;">${p.pm || '-'}</td>
-                    <td style="padding: 7px 8px; border: 1px solid #cbd5e1; text-align: center;">${p.tpe_rd || '-'}/${p.me || '-'}</td>
-                    <td style="padding: 6px 8px; border: 1px solid #cbd5e1; line-height: 1.5;">
-                      ${getProjectKeyMilestonesHTML(p)}
+                ${(dailyReports || []).map((item, idx) => `
+                  <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+                    <td style="border: 1px solid #94a3b8; padding: 8px 6px; text-align: center; font-weight: bold; vertical-align: top;">${item.no}</td>
+                    <td style="border: 1px solid #94a3b8; padding: 8px 10px; font-weight: bold; color: #0f766e; vertical-align: top;">${item.project}</td>
+                    <td style="border: 1px solid #94a3b8; padding: 8px 10px; line-height: 1.5; vertical-align: top;">
+                      <ul style="margin: 0; padding-left: 18px;">
+                        ${(item.actions || []).map(act => `<li style="margin-bottom: 6px;">${act}</li>`).join('')}
+                      </ul>
                     </td>
+                    <td style="border: 1px solid #94a3b8; padding: 8px 6px; text-align: center; vertical-align: top; font-weight: bold;">${item.risk || 'Normal'}</td>
+                    <td style="border: 1px solid #94a3b8; padding: 8px 6px; text-align: center; vertical-align: top;">${item.checkpoint || 'Daily Check'}</td>
                   </tr>
                 `).join('')}
               </tbody>
             </table>
-            <div style="font-size: 10px; color: #64748b; text-align: right;">PM Weekly Report • Master Schedule • ${currentTeam} • Page 1 of 2</div>
           </div>
-
-          <!-- 第二頁：Detail Weekly Report 單頁治具報告 -->
-          <div style="padding-top: 8px;">
-            <div style="background: #0f766e; color: #ffffff; padding: 9px 14px; border-radius: 6px 6px 0 0; display: flex; justify-content: space-between; align-items: center;">
-              <span style="font-size: 14.5px; font-weight: bold;">NPI Project (${curProj.fixture || '治具名稱'}) - ${curProj.phase || '階段'}</span>
-              <span style="font-size: 11px; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 4px;">Detail Weekly Report (${currentTeam})</span>
+        `;
+      } else {
+        return `
+          <div class="email-container" style="max-width: 720px; margin: 0 auto; background: #ffffff; padding: 12px; font-family: Calibri, Arial, 'Microsoft JhengHei', sans-serif; font-size: 12pt; color: #1e293b;">
+            <!-- 專案資訊抬頭 -->
+            <div style="border-bottom: 3px solid #0f766e; padding-bottom: 8px; margin-bottom: 12px;">
+              <h2 style="font-size: 16pt; font-weight: bold; color: #0f766e; margin: 0;">Weekly Report: ${curProj.project || '專案'} (${curProj.fixture || '治具名稱'})</h2>
+              <div style="font-size: 11pt; color: #64748b; margin-top: 4px;">報告日期: ${weeklyReportDate} • 組別: ${currentTeam} • 階段: ${curProj.phase || '-'}</div>
             </div>
 
-            <div style="border: 1px solid #0f766e; border-top: none; padding: 12px; font-size: 11px; border-radius: 0 0 6px 6px;">
-              <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 11px;">
-                <tr>
-                  <td style="width: 14%; background: #f1f5f9; font-weight: bold; padding: 5px 8px; border: 1px solid #cbd5e1;">Customer/CM</td>
-                  <td style="width: 36%; padding: 5px 8px; border: 1px solid #cbd5e1;">${curProj.customer || '-'}</td>
-                  <td style="width: 14%; background: #f1f5f9; font-weight: bold; padding: 5px 8px; border: 1px solid #cbd5e1;">Contact (DRI)</td>
-                  <td style="width: 36%; padding: 5px 8px; border: 1px solid #cbd5e1;">${curProj.contact_customer || '-'}</td>
-                </tr>
-                <tr>
-                  <td style="background: #f1f5f9; font-weight: bold; padding: 5px 8px; border: 1px solid #cbd5e1;">Competitor</td>
-                  <td style="padding: 5px 8px; border: 1px solid #cbd5e1;">${curProj.competitor || 'NA'}</td>
-                  <td style="background: #f1f5f9; font-weight: bold; padding: 5px 8px; border: 1px solid #cbd5e1;">TT Resources</td>
-                  <td style="padding: 5px 8px; border: 1px solid #cbd5e1; font-weight: 600; color: #0f766e;">${curProj.tt_resources || '-'}</td>
-                </tr>
-              </table>
-
-              <div style="margin-bottom: 10px;">
-                <div style="font-weight: bold; background: #e2e8f0; padding: 4px 8px; border: 1px solid #cbd5e1; border-bottom: none; font-size: 11px;">Demand & PO/PR 查核矩陣</div>
-                <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 10.5px;">
-                  <thead>
-                    <tr style="background: #f8fafc; border-bottom: 1px solid #cbd5e1;">
-                      <th style="padding: 5px 6px; border: 1px solid #cbd5e1; text-align: left;">Demand 需求品名</th>
-                      <th style="padding: 5px 6px; border: 1px solid #cbd5e1; width: 45px;">Qty</th>
-                      <th style="padding: 5px 6px; border: 1px solid #cbd5e1; width: 90px;">Site</th>
-                      <th style="padding: 5px 6px; border: 1px solid #cbd5e1; width: 65px;">ETD</th>
-                      <th style="padding: 5px 6px; border: 1px solid #cbd5e1; width: 65px;">ETA</th>
-                      <th style="padding: 5px 6px; border: 1px solid #cbd5e1; width: 42px;">DFM</th>
-                      <th style="padding: 5px 6px; border: 1px solid #cbd5e1; width: 45px;">Quote</th>
-                      <th style="padding: 5px 6px; border: 1px solid #cbd5e1; width: 48px;">PR/PO</th>
-                      <th style="padding: 5px 6px; border: 1px solid #cbd5e1; width: 42px;">K/O</th>
-                      <th style="padding: 5px 6px; border: 1px solid #cbd5e1; width: 42px;">BOM</th>
-                      <th style="padding: 5px 6px; border: 1px solid #cbd5e1; width: 55px;">SW Key</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${(curProj.demands || []).map(d => `
-                      <tr>
-                        <td style="padding: 5px 6px; border: 1px solid #cbd5e1; text-align: left; font-weight: bold;">${d.demand || '-'}</td>
-                        <td style="padding: 5px 6px; border: 1px solid #cbd5e1;">${d.qty || '-'}</td>
-                        <td style="padding: 5px 6px; border: 1px solid #cbd5e1;">${d.site || '-'}</td>
-                        <td style="padding: 5px 6px; border: 1px solid #cbd5e1;">${d.etd || '-'}</td>
-                        <td style="padding: 5px 6px; border: 1px solid #cbd5e1; color: #e11d48; font-weight: bold;">${d.eta || '-'}</td>
-                        <td style="padding: 5px 6px; border: 1px solid #cbd5e1; font-weight:bold; color:#047857;">${d.dfm ? '✓' : '-'}</td>
-                        <td style="padding: 5px 6px; border: 1px solid #cbd5e1;">${d.quote ? '✓' : '-'}</td>
-                        <td style="padding: 5px 6px; border: 1px solid #cbd5e1;">${d.pr_po ? '✓' : '-'}</td>
-                        <td style="padding: 5px 6px; border: 1px solid #cbd5e1;">${d.ko ? '✓' : '-'}</td>
-                        <td style="padding: 5px 6px; border: 1px solid #cbd5e1;">${d.bom ? '✓' : '-'}</td>
-                        <td style="padding: 5px 6px; border: 1px solid #cbd5e1;">${d.sw_key ? '✓' : '-'}</td>
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                </table>
-              </div>
-
-              <div style="border: 1px solid #cbd5e1; background: #f8fafc; padding: 6px 10px; margin-bottom: 10px; border-radius: 4px;">
-                <span style="font-weight: bold; color: #334155;">Schedule 時程重點: </span><span>${curProj.schedule_desc || '待客戶確認需求下單，以利廠內先行備料。'}</span>
-              </div>
-
-              <div style="border: 1px solid #cbd5e1; margin-bottom: 10px; border-radius: 4px; overflow: hidden;">
-                <div style="font-weight: bold; background: #e2e8f0; padding: 4px 10px; border-bottom: 1px solid #cbd5e1;">Project Progress (Process 歷程日誌)</div>
-                <div style="padding: 8px 10px;">
-                  ${(curProj.progress_logs || []).map(l => `
-                    <div style="margin-bottom: 8px; line-height: 1.45;">
-                      <div style="font-weight: bold; color: #0f766e; margin-bottom: 2px;">-[${l.week}]</div>
-                      <div class="rich-editor" style="color: #1e293b; padding-left: 4px;">${l.content || '無日誌紀錄'}</div>
-                    </div>
-                  `).join('')}
-                </div>
-              </div>
-
-              <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-                <tr>
-                  <td style="width: 50%; vertical-align: top; border: 1px solid #fde68a; background: #fefce8; padding: 7px; border-radius: 4px;">
-                    <div style="font-weight: bold; color: #854d0e; margin-bottom: 3px;">Special Issue / Highlight / Call Help</div>
-                    <div class="rich-editor" style="color: #713f12; line-height: 1.4;">${curProj.special_issue || '- 目前無重大卡點 (N/A)'}</div>
-                  </td>
-                  <td style="width: 8px;"></td>
-                  <td style="width: 50%; vertical-align: top; border: 1px solid #99f6e4; background: #f0fdfa; padding: 7px; border-radius: 4px;">
-                    <div style="font-weight: bold; color: #115e59; margin-bottom: 3px;">To-do plan（下週待辦行動方案）</div>
-                    <div class="rich-editor" style="color: #134e4a; line-height: 1.4;">${curProj.todo_plan || '1. 追蹤AM和客戶端正式下單需求。'}</div>
-                  </td>
-                </tr>
-              </table>
-            </div>
-            <div style="font-size: 10px; color: #64748b; text-align: right; margin-top: 6px;">PM Weekly Report • Detailed Fixture Report • ${currentTeam} • Page 2 of 2</div>
-          </div>
-        </div>
-      `;
-    }
-
-    function generateDailyReportPrintHTML() {
-      return `
-        <div style="width: 1040px; margin: 0 auto; background: #ffffff; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px; box-sizing: border-box;">
-          <div style="border-bottom: 2px solid #0f766e; padding-bottom: 8px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: flex-end;">
-            <div>
-              <h1 style="font-size: 22px; font-weight: bold; color: #0f766e; margin: 0; display: flex; align-items: center; gap: 8px;">
-                <span>Daily Report</span>
-                <span style="font-size: 12px; background: #ccfbf1; color: #0f766e; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${currentTeam}</span>
-              </h1>
-              <p style="font-size: 11px; color: #64748b; margin: 4px 0 0 0;">Highlights / Actions / Risk Level / Check Point</p>
-            </div>
-            <div style="text-align: right; font-size: 11px; color: #334155;">
-              <span style="font-weight: bold;">Date: </span><span>${dailyReportDate}</span>
-            </div>
-          </div>
-
-          <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
-            <thead>
-              <tr style="background: #f1f5f9; color: #1e293b; border-top: 1px solid #cbd5e1; border-bottom: 2px solid #0f766e;">
-                <th style="padding: 7px 8px; border: 1px solid #cbd5e1; width: 45px; text-align: center;">No.</th>
-                <th style="padding: 7px 10px; border: 1px solid #cbd5e1; width: 140px;">Project</th>
-                <th style="padding: 7px 10px; border: 1px solid #cbd5e1;">Highlights / Actions</th>
-                <th style="padding: 7px 8px; border: 1px solid #cbd5e1; width: 85px; text-align: center;">Risk level</th>
-                <th style="padding: 7px 8px; border: 1px solid #cbd5e1; width: 95px; text-align: center;">Check point</th>
+            <!-- 基本資料直向摘要表 -->
+            <table style="width: 100%; border-collapse: collapse; font-size: 12pt; margin-bottom: 14px;">
+              <tr>
+                <td style="width: 25%; background-color: #f1f5f9; font-weight: bold; border: 1px solid #94a3b8; padding: 6px 8px;">客戶 / CM工廠</td>
+                <td style="width: 75%; border: 1px solid #94a3b8; padding: 6px 8px;">${curProj.customer || '-'} / ${curProj.cm || '-'}</td>
               </tr>
-            </thead>
-            <tbody>
-              ${(dailyReports || []).map((item, idx) => {
-                let riskBg = '#f1f5f9';
-                let riskCol = '#475569';
-                if (item.risk === 'High') { riskBg = '#fee2e2'; riskCol = '#b91c1c'; }
-                else if (item.risk === 'Medium') { riskBg = '#fef3c7'; riskCol = '#b45309'; }
-                else if (item.risk === 'Low') { riskBg = '#ecfdf5'; riskCol = '#047857'; }
+              <tr>
+                <td style="background-color: #f1f5f9; font-weight: bold; border: 1px solid #94a3b8; padding: 6px 8px;">PM / ME / RD</td>
+                <td style="border: 1px solid #94a3b8; padding: 6px 8px;">PM: ${curProj.pm || '-'} | ME: ${curProj.me || '-'} | RD: ${curProj.tpe_rd || '-'}</td>
+              </tr>
+              <tr>
+                <td style="background-color: #f1f5f9; font-weight: bold; border: 1px solid #94a3b8; padding: 6px 8px;">目前狀態 / 交期</td>
+                <td style="border: 1px solid #94a3b8; padding: 6px 8px; font-weight: bold; color: #0f766e;">狀態: ${curProj.status || '-'} | 交期: ${curProj.deadline || '-'}</td>
+              </tr>
+            </table>
 
-                return `
-                  <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; border-bottom: 1px solid #cbd5e1;">
-                    <td style="padding: 8px 6px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold; vertical-align: top;">
-                      ${item.no}
-                    </td>
-                    <td style="padding: 8px 10px; border: 1px solid #cbd5e1; font-weight: bold; color: #0f766e; vertical-align: top; font-size: 11.5px;">
-                      ${item.project}
-                    </td>
-                    <td style="padding: 8px 10px; border: 1px solid #cbd5e1; line-height: 1.5; vertical-align: top;">
-                      <ul style="margin: 0; padding-left: 16px;">
-                        ${(item.actions || []).map(act => `<li style="margin-bottom: 6px; color: #1e293b;"><div class="rich-editor">${act}</div></li>`).join('')}
-                      </ul>
-                    </td>
-                    <td style="padding: 8px 6px; border: 1px solid #cbd5e1; text-align: center; vertical-align: top;">
-                      <span style="background-color: ${riskBg}; color: ${riskCol}; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; display: inline-block;">
-                        ${item.risk || 'Normal'}
-                      </span>
-                    </td>
-                    <td style="padding: 8px 6px; border: 1px solid #cbd5e1; text-align: center; vertical-align: top; font-weight: 500; color: #334155; font-size: 10.5px;">
-                      ${item.checkpoint || 'Daily Check'}
-                    </td>
+            <!-- 甘特圖模組 -->
+            ${generateGanttChartHTML(curProj)}
+
+            <!-- 需求查核矩陣 -->
+            <div style="font-size: 12pt; font-weight: bold; color: #0f766e; margin: 12px 0 4px 0;">📋 Demand & PO/PR 查核矩陣</div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 11pt; margin-bottom: 14px;">
+              <thead>
+                <tr style="background-color: #f1f5f9; color: #1e293b;">
+                  <th style="border: 1px solid #94a3b8; padding: 5px 6px; text-align: left;">需求項目</th>
+                  <th style="border: 1px solid #94a3b8; padding: 5px 4px; width: 45px; text-align: center;">數量</th>
+                  <th style="border: 1px solid #94a3b8; padding: 5px 6px; width: 85px;">廠區</th>
+                  <th style="border: 1px solid #94a3b8; padding: 5px 6px; width: 75px; text-align: center;">ETD</th>
+                  <th style="border: 1px solid #94a3b8; padding: 5px 4px; width: 45px; text-align: center;">DFM</th>
+                  <th style="border: 1px solid #94a3b8; padding: 5px 4px; width: 45px; text-align: center;">PO</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(curProj.demands || []).map(d => `
+                  <tr>
+                    <td style="border: 1px solid #94a3b8; padding: 5px 6px; font-weight: bold;">${d.demand || '-'}</td>
+                    <td style="border: 1px solid #94a3b8; padding: 5px 4px; text-align: center;">${d.qty || '-'}</td>
+                    <td style="border: 1px solid #94a3b8; padding: 5px 6px;">${d.site || '-'}</td>
+                    <td style="border: 1px solid #94a3b8; padding: 5px 6px; text-align: center;">${d.etd || '-'}</td>
+                    <td style="border: 1px solid #94a3b8; padding: 5px 4px; text-align: center; font-weight: bold; color: #047857;">${d.dfm ? '✓' : '-'}</td>
+                    <td style="border: 1px solid #94a3b8; padding: 5px 4px; text-align: center;">${d.pr_po ? '✓' : '-'}</td>
                   </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
+                `).join('')}
+              </tbody>
+            </table>
 
-          <div style="font-size: 10px; color: #64748b; text-align: right; margin-top: 12px;">
-            Daily Report • ${currentTeam} • Page 1 of 1
+            <!-- 歷程日誌 -->
+            <div style="font-size: 12pt; font-weight: bold; color: #0f766e; margin: 12px 0 4px 0;">📝 Project Progress (歷程週記)</div>
+            ${(curProj.progress_logs || []).map(l => `
+              <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; background: #f8fafc;">
+                <div style="font-weight: bold; color: #0f766e; margin-bottom: 4px; font-size: 11pt;">-[${l.week}]</div>
+                <div style="font-size: 12pt; line-height: 1.5;">${l.content || '無日誌紀錄'}</div>
+              </div>
+            `).join('')}
+
+            <!-- 待辦事項與重點課題 -->
+            <table style="width: 100%; border-collapse: collapse; font-size: 12pt; margin-top: 10px;">
+              <tr>
+                <td style="width: 50%; vertical-align: top; border: 1px solid #fde68a; background-color: #fefce8; padding: 8px;">
+                  <div style="font-weight: bold; color: #854d0e; margin-bottom: 4px;">⚠️ Special Issue / Call Help</div>
+                  <div style="font-size: 12pt; line-height: 1.4;">${curProj.special_issue || '- 目前無重大卡點 (N/A)'}</div>
+                </td>
+                <td style="width: 10px;"></td>
+                <td style="width: 50%; vertical-align: top; border: 1px solid #99f6e4; background-color: #f0fdfa; padding: 8px;">
+                  <div style="font-weight: bold; color: #115e59; margin-bottom: 4px;">🎯 To-do plan (行動方案)</div>
+                  <div style="font-size: 12pt; line-height: 1.4;">${curProj.todo_plan || '1. 追蹤後續進度。'}</div>
+                </td>
+              </tr>
+            </table>
           </div>
-        </div>
-      `;
-    }
-
-    // 雙模式/總排程直接微調下載 PDF
-    function downloadWeeklyReportPDF() {
-      try {
-        const curProj = (projects && projects.length > 0) ? (projects.find(p => p.id === selectedId) || projects[0]) : {};
-        const reportHtml = generateCleanReportHTML();
-        const tempContainer = document.createElement('div');
-        tempContainer.innerHTML = reportHtml;
-        document.body.appendChild(tempContainer);
-
-        const opt = {
-          margin: [6, 6, 6, 6],
-          filename: `PM_Weekly_Report_${currentTeam || 'Group'}_${(curProj.fixture || 'Project').replace(/\s+/g, '_')}_${weeklyReportDate}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0, windowWidth: 1060 },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-        };
-
-        if (typeof html2pdf !== 'undefined') {
-          html2pdf().set(opt).from(tempContainer.firstElementChild).save().then(() => {
-            document.body.removeChild(tempContainer);
-          }).catch(err => {
-            document.body.removeChild(tempContainer);
-            openDedicatedPrintWindow();
-          });
-        } else {
-          document.body.removeChild(tempContainer);
-          openDedicatedPrintWindow();
-        }
-      } catch (e) {
-        openDedicatedPrintWindow();
+        `;
       }
     }
 
-    // Daily Report 直接微調下載 PDF
-    function downloadDailyReportPDF() {
-      try {
-        const reportHtml = generateDailyReportPrintHTML();
-        const tempContainer = document.createElement('div');
-        tempContainer.innerHTML = reportHtml;
-        document.body.appendChild(tempContainer);
+    /* ---------------- 複製郵件內容至剪貼簿 ---------------- */
+    function openEmailCopyModal() {
+      const container = document.getElementById('emailModalBody');
+      container.innerHTML = generateEmailPortraitHTML();
+      document.getElementById('emailCopyModal').classList.remove('hidden');
+    }
 
-        const opt = {
-          margin: [6, 6, 6, 6],
-          filename: `Daily_Report_${currentTeam || 'Group'}_${dailyReportDate}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0, windowWidth: 1060 },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-        };
+    function closeEmailCopyModal() {
+      document.getElementById('emailCopyModal').classList.add('hidden');
+    }
 
-        if (typeof html2pdf !== 'undefined') {
-          html2pdf().set(opt).from(tempContainer.firstElementChild).save().then(() => {
-            document.body.removeChild(tempContainer);
-          }).catch(err => {
-            document.body.removeChild(tempContainer);
-            printDailyReportWindow();
-          });
-        } else {
-          document.body.removeChild(tempContainer);
-          printDailyReportWindow();
-        }
-      } catch (e) {
-        printDailyReportWindow();
+    function copyEmailHTMLToClipboard() {
+      const htmlContent = generateEmailPortraitHTML();
+      if (navigator.clipboard && window.ClipboardItem) {
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const textBlob = new Blob([htmlContent.replace(/<[^>]+>/g, '')], { type: 'text/plain' });
+        const item = new ClipboardItem({ 'text/html': blob, 'text/plain': textBlob });
+        navigator.clipboard.write([item]).then(() => {
+          alert('✅ 已成功複製直向 12pt 郵件格式！請直接在 Outlook 按 Ctrl+V (Cmd+V) 貼上。');
+          closeEmailCopyModal();
+        }).catch(err => {
+          fallbackCopyText(htmlContent);
+        });
+      } else {
+        fallbackCopyText(htmlContent);
       }
+    }
+
+    function fallbackCopyText(htmlContent) {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = htmlContent;
+      tempDiv.style.position = 'fixed';
+      tempDiv.style.left = '-9999px';
+      document.body.appendChild(tempDiv);
+      const range = document.createRange();
+      range.selectNode(tempDiv);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+      document.execCommand('copy');
+      document.body.removeChild(tempDiv);
+      alert('✅ 已複製直向表格內容！請直接在 Outlook 按 Ctrl+V 貼上。');
+      closeEmailCopyModal();
     }
 
     /* ---------------- 全新：導出 Excel (表格化) 原生實作 ---------------- */
@@ -1106,8 +845,8 @@
           </xml>
           <![endif]-->
           <style>
-            table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
-            th, td { border: 0.5pt solid #cbd5e1; padding: 6px 10px; }
+            table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 12pt; }
+            th, td { border: 0.5pt solid #cbd5e1; padding: 6px 10px; font-size: 12pt; }
             th { background-color: #0f766e; color: #ffffff; font-weight: bold; }
           </style>
         </head>
@@ -1130,121 +869,79 @@
       }, 150);
     }
 
-    // 週報導出 Excel
     function exportWeeklyReportExcel() {
-      const reportHtml = generateCleanReportHTML();
-      const fileName = `PM_Weekly_Report_${currentTeam || 'Group'}_${weeklyReportDate}.xls`;
-      downloadTableAsExcel(reportHtml, fileName);
+      const reportHtml = generateEmailPortraitHTML();
+      downloadTableAsExcel(reportHtml, `PM_Weekly_Report_${currentTeam || 'Group'}_${weeklyReportDate}.xls`);
     }
 
-    // 日報導出 Excel
     function exportDailyReportExcel() {
-      const reportHtml = generateDailyReportPrintHTML();
-      const fileName = `Daily_Report_${currentTeam || 'Group'}_${dailyReportDate}.xls`;
-      downloadTableAsExcel(reportHtml, fileName);
+      const reportHtml = generateEmailPortraitHTML();
+      downloadTableAsExcel(reportHtml, `Daily_Report_${currentTeam || 'Group'}_${dailyReportDate}.xls`);
     }
 
-    function openDedicatedPrintWindow() {
-      const reportHtml = generateCleanReportHTML();
-      const printWindow = window.open('', '_blank', 'width=1150,height=850');
-      if (!printWindow) {
-        window.print();
-        return;
-      }
-      printWindow.document.write('<!DOCTYPE html><html><head><title>PM Weekly Report (' + currentTeam + ') - ' + weeklyReportDate + '</title><meta charset="utf-8"><style>@page { size: A4 landscape; margin: 8mm 6mm; } body { margin: 0; padding: 0; background: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }</style></head><body>' + reportHtml + '</body></html>');
-      printWindow.document.close();
-      setTimeout(function() {
-        printWindow.focus();
-        printWindow.print();
-      }, 400);
-    }
-
-    function printDailyReportWindow() {
-      const reportHtml = generateDailyReportPrintHTML();
-      const printWindow = window.open('', '_blank', 'width=1150,height=850');
-      if (!printWindow) {
-        window.print();
-        return;
-      }
-      printWindow.document.write('<!DOCTYPE html><html><head><title>Daily Report (' + currentTeam + ') - ' + dailyReportDate + '</title><meta charset="utf-8"><style>@page { size: A4 landscape; margin: 8mm 6mm; } body { margin: 0; padding: 0; background: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }</style></head><body>' + reportHtml + '</body></html>');
-      printWindow.document.close();
-      setTimeout(function() {
-        printWindow.focus();
-        printWindow.print();
-      }, 400);
-    }
-
-    function exportBackupJSON() {
+    /* ---------------- PDF 匯出函式（A4 直向版） ---------------- */
+    function downloadWeeklyReportPDF() {
       try {
-        const data = {
-          version: '2026.11',
-          team: currentTeam,
-          exportDate: new Date().toISOString(),
-          weeklyReportDate: weeklyReportDate,
-          dailyReportDate: dailyReportDate,
-          projects: projects,
-          weeks: weeks,
-          dailyReports: dailyReports
+        const reportHtml = generateEmailPortraitHTML();
+        const tempContainer = document.createElement('div');
+        tempContainer.innerHTML = reportHtml;
+        document.body.appendChild(tempContainer);
+
+        const opt = {
+          margin: [8, 8, 8, 8],
+          filename: `PM_Weekly_Report_${currentTeam || 'Group'}_${weeklyReportDate}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0, windowWidth: 780 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
-        const jsonStr = JSON.stringify(data, null, 2);
-        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
-        const fileName = `PM_Backup_${currentTeam || 'Group'}_${new Date().toISOString().slice(0, 10)}.json`;
 
-        if (window.navigator && window.navigator.msSaveOrOpenBlob) {
-          window.navigator.msSaveOrOpenBlob(blob, fileName);
-          return;
+        if (typeof html2pdf !== 'undefined') {
+          html2pdf().set(opt).from(tempContainer.firstElementChild).save().then(() => {
+            document.body.removeChild(tempContainer);
+          }).catch(err => {
+            document.body.removeChild(tempContainer);
+            window.print();
+          });
+        } else {
+          document.body.removeChild(tempContainer);
+          window.print();
         }
-
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.setAttribute('download', fileName);
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }, 150);
-      } catch (err) {
-        alert('備份失敗: ' + err.message);
+      } catch (e) {
+        window.print();
       }
     }
 
-    function triggerImportJSON() {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.json';
-      input.onchange = function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-          try {
-            const data = JSON.parse(evt.target.result);
-            if (data.projects && Array.isArray(data.projects)) {
-              projects = data.projects;
-              if (data.weeks) weeks = data.weeks;
-              if (data.dailyReports) dailyReports = data.dailyReports;
-              if (data.dailyReportDate) dailyReportDate = data.dailyReportDate;
-              if (data.weeklyReportDate) weeklyReportDate = data.weeklyReportDate;
-              selectedId = projects[0] ? projects[0].id : '';
-              saveState();
-              renderApp();
-              alert(`✅ 備份資料已成功還原至 [組別: ${currentTeam}]！`);
-            } else {
-              alert('❌ 檔案格式不符合！');
-            }
-          } catch(err) {
-            alert('❌ 讀取備份檔案失敗: ' + err.message);
-          }
+    function downloadDailyReportPDF() {
+      try {
+        const reportHtml = generateEmailPortraitHTML();
+        const tempContainer = document.createElement('div');
+        tempContainer.innerHTML = reportHtml;
+        document.body.appendChild(tempContainer);
+
+        const opt = {
+          margin: [8, 8, 8, 8],
+          filename: `Daily_Report_${currentTeam || 'Group'}_${dailyReportDate}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0, windowWidth: 780 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
-        reader.readAsText(file);
-      };
-      input.click();
+
+        if (typeof html2pdf !== 'undefined') {
+          html2pdf().set(opt).from(tempContainer.firstElementChild).save().then(() => {
+            document.body.removeChild(tempContainer);
+          }).catch(err => {
+            document.body.removeChild(tempContainer);
+            window.print();
+          });
+        } else {
+          document.body.removeChild(tempContainer);
+          window.print();
+        }
+      } catch (e) {
+        window.print();
+      }
     }
 
-    /* ---------------- 週報欄位更新函式 ---------------- */
     function commitField(projId, field, val) {
       projects = projects.map(p => p.id === projId ? { ...p, [field]: val } : p);
       saveState();
@@ -1349,17 +1046,6 @@
       renderApp();
     }
 
-    function duplicateProject(id) {
-      const target = projects.find(p => p.id === id);
-      if (!target) return;
-      const copy = JSON.parse(JSON.stringify(target));
-      copy.id = 'proj_' + Date.now();
-      copy.fixture = (copy.fixture || '專案') + ' (副本)';
-      projects.push(copy);
-      selectedId = copy.id;
-      renderApp();
-    }
-
     function deleteProject(id) {
       projects = projects.filter(p => p.id !== id);
       if (projects.length === 0) projects = (currentTeam === 'Jane') ? JSON.parse(JSON.stringify(JANE_INITIAL_PROJECTS)) : createBlankProject();
@@ -1380,67 +1066,65 @@
       }
     }
 
-    function addNewWeek() {
-      const lastWeek = weeks[weeks.length - 1];
-      let nextWkNum = 1, nextDate = '1/5', nextMonth = 'Jan-27';
-      if (lastWeek) {
-        const m = lastWeek.week.match(/\d+/);
-        if (m) nextWkNum = parseInt(m[0], 10) + 1;
-        if (lastWeek.date && lastWeek.date.includes('/')) {
-          const [mo, da] = lastWeek.date.split('/').map(n => parseInt(n, 10));
-          const d = new Date(2026, mo - 1, da);
-          d.setDate(d.getDate() + 7);
-          nextDate = `${d.getMonth() + 1}/${d.getDate()}`;
-          const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-          nextMonth = `${monthNames[d.getMonth()]}-${String(d.getFullYear()).slice(-2)}`;
-        }
-      }
-      weeks.push({ id: 'w_' + Date.now(), week: `WK${nextWkNum}`, month: nextMonth, date: nextDate });
-      renderApp();
+    function exportBackupJSON() {
+      const data = {
+        version: '2026.11',
+        team: currentTeam,
+        exportDate: new Date().toISOString(),
+        weeklyReportDate: weeklyReportDate,
+        dailyReportDate: dailyReportDate,
+        projects: projects,
+        weeks: weeks,
+        dailyReports: dailyReports
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `PM_Backup_${currentTeam || 'Group'}_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 150);
     }
 
-    function deleteWeek(id) {
-      if (weeks.length <= 1) return;
-      weeks = weeks.filter(w => w.id !== id);
-      renderApp();
-    }
-
-    function liveColorBadge(inputEl) {
-      if (inputEl.style.backgroundColor && inputEl.style.backgroundColor !== '') return;
-      const val = inputEl.value;
-      inputEl.className = "w-full text-center text-[10px] leading-tight py-1 pr-3 focus:bg-white rounded font-medium";
-      if (val.includes('DFM') || val.includes('需求')) inputEl.classList.add('bg-blue-100', 'text-blue-800', 'font-bold');
-      else if (val.includes('KO') || val.includes('BOM')) inputEl.classList.add('bg-purple-100', 'text-purple-800', 'font-bold');
-      else if (val.includes('採購') || val.includes('備料')) inputEl.classList.add('bg-amber-100', 'text-amber-800', 'font-bold');
-      else if (val.includes('組裝') || val.includes('調適')) inputEl.classList.add('bg-orange-100', 'text-orange-800', 'font-bold');
-      else inputEl.classList.add('bg-transparent', 'text-slate-700');
-    }
-
-    function handleCellKey(e, inputEl) {
-      if (e.key === 'Enter') inputEl.blur();
-    }
-
-    function commitMilestone(projId, weekId, val) {
-      projects = projects.map(p => {
-        if (p.id !== projId) return p;
-        const cur = (p.milestones && p.milestones[weekId]) || '';
-        if (typeof cur === 'object') {
-          return { ...p, milestones: { ...(p.milestones || {}), [weekId]: { ...cur, text: val } } };
-        } else {
-          return { ...p, milestones: { ...(p.milestones || {}), [weekId]: val } };
-        }
-      });
-      saveState();
+    function triggerImportJSON() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          try {
+            const data = JSON.parse(evt.target.result);
+            if (data.projects && Array.isArray(data.projects)) {
+              projects = data.projects;
+              if (data.weeks) weeks = data.weeks;
+              if (data.dailyReports) dailyReports = data.dailyReports;
+              if (data.dailyReportDate) dailyReportDate = data.dailyReportDate;
+              if (data.weeklyReportDate) weeklyReportDate = data.weeklyReportDate;
+              selectedId = projects[0] ? projects[0].id : '';
+              saveState();
+              renderApp();
+              alert(`✅ 備份資料已成功還原！`);
+            }
+          } catch(err) {
+            alert('❌ 讀取失敗: ' + err.message);
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
     }
 
     function renderApp() {
       if (!checkAuth()) return;
-      const scrollContainer = document.getElementById('masterScrollContainer');
-      const savedScrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0;
-
       saveState();
       const curProj = (projects && projects.length > 0) ? (projects.find(p => p.id === selectedId) || projects[0]) : {};
-      const monthGroups = getMonthGroups();
 
       const app = document.getElementById('app');
       app.innerHTML = `
@@ -1450,9 +1134,7 @@
             <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-teal-700 flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-sm flex-shrink-0">PM</div>
             <div>
               <div class="flex items-center gap-2 flex-wrap">
-                <h1 class="text-base sm:text-lg md:text-xl font-bold text-slate-800 tracking-tight">
-                  PM 專案管理系統
-                </h1>
+                <h1 class="text-base sm:text-lg md:text-xl font-bold text-slate-800 tracking-tight">PM 專案管理系統</h1>
                 <div class="flex items-center gap-1 bg-teal-50 border border-teal-300 text-teal-800 text-xs px-2.5 py-0.5 rounded-full font-bold shadow-sm">
                   <span>🏷️ 組別:</span>
                   <select onchange="switchTeam(this.value)" class="bg-transparent font-extrabold focus:outline-none cursor-pointer">
@@ -1466,9 +1148,7 @@
               <div class="flex items-center gap-3 text-[11px] sm:text-xs text-slate-500 flex-wrap">
                 <span>${currentTeam ? `組別: ${currentTeam} 專屬空間 (?team=${currentTeam})` : '尚未選擇組別，請由上方選取【Jane】或點擊【➕】新增'}</span>
                 <span class="text-slate-300">|</span>
-                <span class="text-teal-700 font-semibold flex items-center gap-1">
-                  <span>👤</span><span>${getLoggedInUser() || '使用者'}</span>
-                </span>
+                <span class="text-teal-700 font-semibold flex items-center gap-1">👤 ${getLoggedInUser() || '使用者'}</span>
                 <button type="button" onclick="handleLogout()" class="text-rose-600 hover:text-rose-800 font-semibold underline text-[11px]">登出</button>
               </div>
             </div>
@@ -1483,20 +1163,22 @@
                 <button type="button" onclick="setViewMode('daily')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'daily' ? 'bg-teal-700 text-white shadow-sm font-bold' : 'text-teal-700 font-bold hover:bg-slate-200'}">📋 Daily Report</button>
               </div>
 
-              <button type="button" onclick="exportBackupJSON()" title="將目前組別的所有資料下載成備份檔" class="bg-slate-700 hover:bg-slate-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition flex items-center gap-1">💾 備份資料</button>
-              <button type="button" onclick="triggerImportJSON()" title="上傳備份檔還原至目前組別" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium transition flex items-center gap-1">📂 還原資料</button>
+              <!-- 直向 12pt 郵件複製按鈕 -->
+              <button type="button" onclick="openEmailCopyModal()" title="預覽並一鍵複製符合字體 12 的直向郵件格式" class="bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-1">
+                <span>✉️</span><span>複製郵件格式</span>
+              </button>
+
+              <button type="button" onclick="exportBackupJSON()" class="bg-slate-700 hover:bg-slate-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition flex items-center gap-1">💾 備份資料</button>
+              <button type="button" onclick="triggerImportJSON()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium transition flex items-center gap-1">📂 還原資料</button>
 
               ${viewMode === 'daily' ? `
                 <button type="button" onclick="addDailyProject()" class="bg-teal-700 hover:bg-teal-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition">+ 新增專案項</button>
                 <button type="button" onclick="downloadDailyReportPDF()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-1"><span>📄</span><span>匯出 Daily PDF</span></button>
                 <button type="button" onclick="exportDailyReportExcel()" class="bg-sky-700 hover:bg-sky-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-1"><span>📊</span><span>匯出 Daily Excel</span></button>
-                <button type="button" onclick="printDailyReportWindow()" class="bg-slate-800 hover:bg-slate-900 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition hidden sm:inline-block">列印日報</button>
-                <button type="button" onclick="resetDailyReport()" class="text-[11px] sm:text-xs text-rose-600 hover:bg-rose-50 px-2 py-1.5 rounded-lg transition">還原日報範本</button>
               ` : `
                 <button type="button" onclick="addNewProject()" class="bg-teal-700 hover:bg-teal-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition">+ 治具</button>
                 <button type="button" onclick="downloadWeeklyReportPDF()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-1"><span>📄</span><span>匯出 PDF</span></button>
                 <button type="button" onclick="exportWeeklyReportExcel()" class="bg-sky-700 hover:bg-sky-800 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-1"><span>📊</span><span>匯出 Excel</span></button>
-                <button type="button" onclick="openDedicatedPrintWindow()" class="bg-slate-800 hover:bg-slate-900 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium shadow-sm transition hidden sm:inline-block">列印週報</button>
                 <button type="button" onclick="resetToInitialData()" class="text-[11px] sm:text-xs text-rose-600 hover:bg-rose-50 px-2 py-1.5 rounded-lg transition">恢復報告資訊</button>
               `}
             </div>
@@ -1505,25 +1187,15 @@
 
         ${!currentTeam ? `
           <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 sm:p-12 text-center my-6 max-w-2xl mx-auto">
-            <div class="w-16 h-16 bg-teal-50 text-teal-700 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 border border-teal-200">
-              🏷️
-            </div>
+            <div class="w-16 h-16 bg-teal-50 text-teal-700 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 border border-teal-200">🏷️</div>
             <h2 class="text-xl font-bold text-slate-800 mb-2">歡迎使用 PM 專案管理系統</h2>
             <p class="text-sm text-slate-600 mb-6 leading-relaxed">
-              目前尚未選取組別。請由上方下拉選單選擇【Jane】查看進行中的 WNV1 專案，<br>
-              或點擊【➕】建立專屬的全新空白組別（僅提供完整表格結構，不帶入他人內容）。
+              請由上方下拉選單選擇【Jane】查看進行中的 WNV1 專案，或點擊【➕】建立全新空白組別。
             </p>
-            <div class="flex items-center justify-center gap-3">
-              <button type="button" onclick="switchTeam('Jane')" class="bg-teal-700 hover:bg-teal-800 text-white text-sm font-bold px-5 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5">
-                <span>進入 Jane 組別</span>
-              </button>
-              <button type="button" onclick="promptNewTeam()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold px-5 py-2.5 rounded-xl border border-slate-300 transition flex items-center gap-1.5">
-                <span>➕ 建立全新空白組別</span>
-              </button>
-            </div>
+            <button type="button" onclick="switchTeam('Jane')" class="bg-teal-700 hover:bg-teal-800 text-white text-sm font-bold px-6 py-2.5 rounded-xl shadow-sm transition">進入 Jane 組別</button>
           </div>
         ` : `
-          <!-- 模組三：Daily Report (已支援圖片截圖貼上、Excel表格與附件上傳) -->
+          <!-- 模組三：Daily Report -->
           <section id="section-daily" class="${viewMode !== 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border-2 border-teal-700 overflow-hidden">
             <div class="p-3 sm:p-4 bg-teal-800 text-white flex flex-wrap items-center justify-between gap-3">
               <div class="flex items-center gap-3">
@@ -1532,17 +1204,17 @@
               </div>
               <div class="flex items-center gap-2 text-xs">
                 <span class="text-teal-200 font-medium">日報日期:</span>
-                <input type="date" value="${dailyReportDate}" onchange="updateDailyDate(this.value)" class="bg-teal-900 border border-teal-600 text-white text-xs px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-teal-400 cursor-pointer" />
+                <input type="date" value="${dailyReportDate}" onchange="updateDailyDate(this.value)" class="bg-teal-900 border border-teal-600 text-white text-xs px-2 py-1 rounded focus:outline-none cursor-pointer" />
               </div>
             </div>
 
-            <div class="overflow-x-auto touch-scroll max-h-[640px] text-xs">
+            <div class="overflow-x-auto touch-scroll text-xs">
               <table class="w-full border-collapse text-left min-w-[950px]">
-                <thead class="bg-slate-100 text-slate-700 sticky top-0 z-20 select-none shadow-sm">
+                <thead class="bg-slate-100 text-slate-700 sticky top-0 z-20 shadow-sm">
                   <tr class="border-b border-slate-300 font-bold text-xs bg-slate-200">
                     <th class="p-2.5 border-r border-slate-300 w-12 text-center">No.</th>
                     <th class="p-2.5 border-r border-slate-300 w-44">Project</th>
-                    <th class="p-2.5 border-r border-slate-300">Highlights / Actions (支援直接截圖 Ctrl+V 貼上圖片、貼上 Excel 表格或點 📎 上傳)</th>
+                    <th class="p-2.5 border-r border-slate-300">Highlights / Actions</th>
                     <th class="p-2.5 border-r border-slate-300 w-28 text-center">Risk level</th>
                     <th class="p-2.5 border-r border-slate-300 w-32 text-center">Check point</th>
                     <th class="no-print p-2.5 w-16 text-center bg-slate-200">操作</th>
@@ -1551,369 +1223,92 @@
                 <tbody class="divide-y divide-slate-200">
                   ${(dailyReports || []).map((dItem, pIdx) => `
                     <tr class="hover:bg-slate-50/80 transition ${pIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}">
-                      <td class="p-2 border-r border-slate-200 text-center font-bold text-slate-600 align-top">
-                        ${dItem.no}
-                      </td>
-                      <td class="p-2 border-r border-slate-200 align-top">
-                        <input 
-                          type="text" 
-                          value="${dItem.project}" 
-                          oninput="updateDailyProject(${pIdx}, 'project', this.value)" 
-                          class="w-full bg-transparent font-bold text-teal-800 text-xs py-1 px-1.5 focus:bg-white rounded border border-transparent hover:border-slate-300 focus:border-teal-500" 
-                        />
-                      </td>
+                      <td class="p-2 border-r border-slate-200 text-center font-bold text-slate-600 align-top">${dItem.no}</td>
+                      <td class="p-2 border-r border-slate-200 align-top font-bold text-teal-800">${dItem.project}</td>
                       <td class="p-2 border-r border-slate-200 align-top">
                         <div class="space-y-2">
                           ${(dItem.actions || []).map((act, aIdx) => `
-                            <div class="flex items-start gap-1.5 group/act bg-white/70 hover:bg-white p-1 rounded-lg border border-transparent hover:border-slate-200 transition">
-                              <span class="text-teal-600 font-bold mt-1 text-[11px] flex-shrink-0">•</span>
+                            <div class="flex items-start gap-1.5 group/act bg-white/70 hover:bg-white p-1 rounded-lg border border-transparent hover:border-slate-200">
+                              <span class="text-teal-600 font-bold mt-1 text-[11px]">•</span>
                               <div 
                                 contenteditable="true"
-                                placeholder="可直接打字、貼上 Excel 表格，或直接按 Ctrl+V 貼上截圖..."
+                                placeholder="可直接打字、貼上 Excel 表格，或按 Ctrl+V 貼上截圖..."
                                 onpaste="handleRichPaste(event, () => updateDailyActionHTML(${pIdx}, ${aIdx}, this.innerHTML))"
                                 onblur="updateDailyActionHTML(${pIdx}, ${aIdx}, this.innerHTML)"
-                                class="rich-editor flex-1 text-xs p-1.5 rounded focus:outline-none focus:ring-1 focus:ring-teal-500 text-slate-800"
+                                class="rich-editor flex-1 text-xs p-1.5 rounded focus:ring-1 focus:ring-teal-500 text-slate-800"
                               >${act}</div>
-                              <div class="no-print flex items-center gap-1 opacity-0 group-hover/act:opacity-100 transition mt-1 flex-shrink-0">
-                                <button 
-                                  type="button" 
-                                  title="點擊上傳圖片附件"
-                                  onclick="triggerImageUpload((b64) => appendImageToDailyAction(${pIdx}, ${aIdx}, b64))"
-                                  class="text-teal-600 hover:text-teal-800 text-xs px-1 hover:bg-teal-50 rounded"
-                                >📎</button>
-                                <button 
-                                  type="button"
-                                  onclick="deleteDailyAction(${pIdx}, ${aIdx})" 
-                                  title="刪除此項"
-                                  class="text-slate-300 hover:text-rose-600 text-xs px-1"
-                                >✕</button>
+                              <div class="no-print flex items-center gap-1 opacity-0 group-hover/act:opacity-100 transition mt-1">
+                                <button type="button" onclick="triggerImageUpload((b64) => appendImageToDailyAction(${pIdx}, ${aIdx}, b64))" class="text-teal-600 hover:text-teal-800 text-xs px-1">📎</button>
+                                <button type="button" onclick="deleteDailyAction(${pIdx}, ${aIdx})" class="text-slate-300 hover:text-rose-600 text-xs px-1">✕</button>
                               </div>
                             </div>
                           `).join('')}
-                          <button 
-                            type="button"
-                            onclick="addDailyAction(${pIdx})" 
-                            class="no-print text-[11px] text-teal-700 hover:text-teal-900 font-semibold flex items-center gap-1 mt-1 px-1 py-0.5 rounded hover:bg-teal-50 transition"
-                          >
-                            <span>+ 新增事項</span>
-                          </button>
+                          <button type="button" onclick="addDailyAction(${pIdx})" class="no-print text-[11px] text-teal-700 hover:text-teal-900 font-semibold">+ 新增事項</button>
                         </div>
                       </td>
-                      <td class="p-2 border-r border-slate-200 text-center align-top">
-                        <select 
-                          onchange="updateDailyProject(${pIdx}, 'risk', this.value)" 
-                          class="text-xs font-bold px-2.5 py-1 rounded-md border focus:outline-none cursor-pointer transition shadow-sm ${
-                            dItem.risk === 'High' ? 'bg-rose-100 text-rose-800 border-rose-400 font-extrabold ring-1 ring-rose-300' :
-                            (dItem.risk === 'Medium' ? 'bg-amber-100 text-amber-800 border-amber-400' :
-                            (dItem.risk === 'Low' ? 'bg-emerald-100 text-emerald-800 border-emerald-400' : 'bg-slate-100 text-slate-700 border-slate-300'))
-                          }"
-                        >
-                          <option value="High" class="bg-rose-100 text-rose-800 font-bold" ${dItem.risk === 'High' ? 'selected' : ''}>High</option>
-                          <option value="Medium" class="bg-amber-100 text-amber-800 font-bold" ${dItem.risk === 'Medium' ? 'selected' : ''}>Medium</option>
-                          <option value="Low" class="bg-emerald-100 text-emerald-800 font-bold" ${dItem.risk === 'Low' ? 'selected' : ''}>Low</option>
-                          <option value="Normal" class="bg-slate-100 text-slate-700" ${dItem.risk === 'Normal' ? 'selected' : ''}>Normal</option>
-                        </select>
-                      </td>
-                      <td class="p-2 border-r border-slate-200 text-center align-top">
-                        <input 
-                          type="text" 
-                          value="${dItem.checkpoint || 'Daily Check'}" 
-                          oninput="updateDailyProject(${pIdx}, 'checkpoint', this.value)" 
-                          class="w-full text-center bg-transparent py-1 px-1 text-xs text-slate-700 font-medium focus:bg-white rounded border border-transparent hover:border-slate-300 focus:border-teal-500" 
-                        />
-                      </td>
+                      <td class="p-2 border-r border-slate-200 text-center align-top font-bold text-emerald-800">${dItem.risk || 'Normal'}</td>
+                      <td class="p-2 border-r border-slate-200 text-center align-top text-slate-700">${dItem.checkpoint || 'Daily Check'}</td>
                       <td class="no-print p-2 text-center align-top">
-                        <button 
-                          type="button"
-                          onclick="deleteDailyProject(${pIdx})" 
-                          title="刪除整個專案項"
-                          class="text-slate-400 hover:text-rose-600 font-bold text-xs p-1 rounded hover:bg-rose-50 transition"
-                        >
-                          刪除
-                        </button>
+                        <button type="button" onclick="deleteDailyProject(${pIdx})" class="text-slate-400 hover:text-rose-600 font-bold text-xs p-1">刪除</button>
                       </td>
                     </tr>
                   `).join('')}
                 </tbody>
               </table>
             </div>
-
-            <div class="bg-slate-50 border-t border-slate-200 px-4 py-2.5 flex items-center justify-between text-xs text-slate-500">
-              <span>Daily Report Dedicated Sheet • ${currentTeam} 獨立排版與 PDF/Excel 匯出</span>
-              <div class="flex items-center gap-2">
-                <button type="button" onclick="downloadDailyReportPDF()" class="no-print text-xs text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1">
-                  <span>📄 匯出 Daily PDF</span>
-                </button>
-                <button type="button" onclick="exportDailyReportExcel()" class="no-print text-xs text-sky-700 hover:text-sky-900 font-bold flex items-center gap-1">
-                  <span>📊 匯出 Daily Excel</span>
-                </button>
-              </div>
-            </div>
           </section>
 
-          <!-- 模組一：總排程主表 (Master Schedule) -->
-          <section id="section-master" class="${viewMode === 'detail' || viewMode === 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden page-break">
-            <div class="p-3 sm:p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-              <div class="flex items-center gap-2 flex-wrap">
+          <!-- 模組一：總排程主表 (已包含甘特圖預覽) -->
+          <section id="section-master" class="${viewMode === 'detail' || viewMode === 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-3 sm:p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
                 <div class="w-2.5 h-4 sm:h-5 bg-teal-600 rounded"></div>
                 <h2 class="text-sm sm:text-base font-bold text-slate-800 tracking-tight">PM weekly report (${currentTeam})</h2>
-                <span class="text-[11px] sm:text-xs text-slate-400">（共 ${projects ? projects.length : 0} 項治具）</span>
-                <div class="flex items-center gap-1 text-xs bg-white border border-slate-300 px-2 py-0.5 rounded-md shadow-sm ml-2">
-                  <span class="text-slate-500 font-medium">📅 週報日期:</span>
-                  <input 
-                    type="date" 
-                    value="${weeklyReportDate}" 
-                    onchange="updateWeeklyDate(this.value)" 
-                    class="text-xs font-bold text-teal-800 bg-transparent focus:outline-none cursor-pointer" 
-                  />
-                </div>
+                <span class="text-xs text-slate-400">（共 ${projects.length} 項治具）</span>
               </div>
-              <div class="no-print flex items-center gap-1.5 sm:gap-2">
-                <button type="button" onclick="addNewWeek()" class="text-[11px] sm:text-xs bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-md transition">+ 新增週次</button>
-                <button type="button" onclick="addNewProject()" class="text-[11px] sm:text-xs bg-teal-600 hover:bg-teal-700 text-white font-medium px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-md transition">+ 新增治具</button>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="openEmailCopyModal()" class="text-xs bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold px-2.5 py-1 rounded-md shadow-sm hover:bg-indigo-100 transition">✉️ 複製直向甘特圖郵件格式</button>
               </div>
             </div>
 
-            <div id="masterScrollContainer" class="overflow-x-auto touch-scroll max-h-[520px] text-xs">
-              <table class="w-full border-collapse text-center min-w-[1320px]">
-                <thead class="bg-slate-100 text-slate-700 select-none shadow-sm sticky top-0 z-20">
-                  <tr class="border-b border-slate-300 font-bold text-xs bg-slate-200">
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[75px] sticky-col-header">專案</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[50px]">位置</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[90px]">CM工廠</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[65px]">階段</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[170px] text-left pl-3">治具名稱 (Fixture)</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[65px]">狀態</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[75px]">交期</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[65px]">PM</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[80px]">TPE RD</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[120px]">TT EE</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[65px]">ME</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[60px]">SW</th>
-                    <th rowSpan="2" class="p-2 border-r border-slate-300 min-w-[60px]">FAE</th>
-                    ${monthGroups.map(mg => `
-                      <th colSpan="${mg.span}" class="p-1 border-r border-slate-300 text-center font-bold text-slate-800 bg-slate-300 tracking-wider text-[11px]">${mg.month}</th>
-                    `).join('')}
-                    <th rowSpan="2" class="no-print p-2 min-w-[85px] bg-slate-200">操作</th>
-                  </tr>
-                  <tr class="border-b border-slate-300 text-[11px] font-semibold bg-slate-100">
-                    ${weeks.map(w => `
-                      <th class="p-1 border-r border-slate-300 min-w-[72px] relative group">
-                        <div class="flex flex-col items-center">
-                          <span class="text-teal-800 font-bold">${w.date}</span>
-                          <span class="text-slate-500 text-[10px]">${w.week}</span>
-                        </div>
-                        ${weeks.length > 1 ? `
-                          <button type="button" onclick="deleteWeek('${w.id}')" title="刪除此週" class="no-print absolute top-0.5 right-0.5 hidden group-hover:block text-slate-400 hover:text-rose-600 text-[10px] px-1 font-bold">×</button>
-                        ` : ''}
-                      </th>
-                    `).join('')}
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-200">
-                  ${projects.map((proj, pIdx) => {
-                    const isSel = proj.id === selectedId;
-                    return `
-                      <tr class="transition ${isSel ? 'bg-teal-50 font-medium' : (pIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60')} hover:bg-teal-50/50">
-                        <td class="p-1 border-r border-slate-200 cursor-pointer sticky-col-1" onclick="selectProject('${proj.id}')" title="點擊切換下方週報">
-                          <input type="text" value="${proj.project || ''}" onblur="commitField('${proj.id}', 'project', this.value)" class="w-full bg-transparent text-center font-bold text-teal-900 focus:bg-white rounded py-1" />
-                        </td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.location || ''}" onblur="commitField('${proj.id}', 'location', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.cm || ''}" onblur="commitField('${proj.id}', 'cm', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.phase || ''}" onblur="commitField('${proj.id}', 'phase', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 font-semibold text-slate-700" /></td>
-                        <td class="p-1 border-r border-slate-200 text-left pl-2"><input type="text" value="${proj.fixture || ''}" onblur="commitField('${proj.id}', 'fixture', this.value)" class="w-full bg-transparent focus:bg-white rounded py-1 px-1 font-medium text-slate-900" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.status || ''}" onblur="commitField('${proj.id}', 'status', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 font-bold ${
-                          proj.status === '完成' ? 'text-emerald-700' : (proj.status === '組裝' ? 'text-amber-700' : 'text-sky-700')
-                        }" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.deadline || ''}" onblur="commitField('${proj.id}', 'deadline', this.value)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-rose-700 font-semibold" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.pm || ''}" oninput="commitField('${proj.id}', 'pm', this.value)" onblur="commitField('${proj.id}', 'pm', this.value)" onkeydown="handleCellKey(event, this)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-800 font-medium" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.tpe_rd || ''}" oninput="commitField('${proj.id}', 'tpe_rd', this.value)" onblur="commitField('${proj.id}', 'tpe_rd', this.value)" onkeydown="handleCellKey(event, this)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-800 font-medium" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.tt_ee || ''}" oninput="commitField('${proj.id}', 'tt_ee', this.value)" onblur="commitField('${proj.id}', 'tt_ee', this.value)" onkeydown="handleCellKey(event, this)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-800 font-semibold" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.me || ''}" oninput="commitField('${proj.id}', 'me', this.value)" onblur="commitField('${proj.id}', 'me', this.value)" onkeydown="handleCellKey(event, this)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-800 font-medium" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.sw || ''}" oninput="commitField('${proj.id}', 'sw', this.value)" onblur="commitField('${proj.id}', 'sw', this.value)" onkeydown="handleCellKey(event, this)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-800 font-semibold" /></td>
-                        <td class="p-1 border-r border-slate-200"><input type="text" value="${proj.fae || ''}" oninput="commitField('${proj.id}', 'fae', this.value)" onblur="commitField('${proj.id}', 'fae', this.value)" onkeydown="handleCellKey(event, this)" class="w-full bg-transparent text-center focus:bg-white rounded py-1 text-slate-800 font-semibold" /></td>
-                        ${weeks.map(w => {
-                          const mItem = (proj.milestones && proj.milestones[w.id]) || '';
-                          const textVal = typeof mItem === 'object' ? (mItem.text || '') : mItem;
-                          const hasCustomColor = typeof mItem === 'object' && (mItem.bg || mItem.color);
-                          
-                          let styleAttr = '';
-                          let badgeStyle = 'bg-transparent text-slate-700';
-
-                          if (hasCustomColor) {
-                            styleAttr = `style="background-color: ${mItem.bg || '#ffffff'}; color: ${mItem.color || '#0f172a'}; font-weight: bold;"`;
-                          } else {
-                            if (textVal.includes('DFM') || textVal.includes('需求')) badgeStyle = 'bg-blue-100 text-blue-800 font-bold';
-                            else if (textVal.includes('KO') || textVal.includes('BOM')) badgeStyle = 'bg-purple-100 text-purple-800 font-bold';
-                            else if (textVal.includes('採購') || textVal.includes('備料')) badgeStyle = 'bg-amber-100 text-amber-800 font-bold';
-                            else if (textVal.includes('組裝') || textVal.includes('調適')) badgeStyle = 'bg-orange-100 text-orange-800 font-bold';
-                          }
-
-                          return `
-                            <td class="p-0.5 border-r border-slate-200 min-w-[76px] relative group/cell">
-                              <div class="relative flex items-center">
-                                <input 
-                                  type="text" 
-                                  value="${textVal}" 
-                                  placeholder="-" 
-                                  oninput="liveColorBadge(this)" 
-                                  onblur="commitMilestone('${proj.id}', '${w.id}', this.value)" 
-                                  onkeydown="handleCellKey(event, this)" 
-                                  class="w-full text-center text-[10px] leading-tight py-1 pr-3 focus:bg-white rounded ${badgeStyle}" 
-                                  ${styleAttr}
-                                />
-                                <button 
-                                  type="button" 
-                                  title="變更文字色彩與醒目標籤"
-                                  onclick="openColorPalette('${proj.id}', '${w.id}', this)"
-                                  class="no-print absolute right-0.5 opacity-0 group-hover/cell:opacity-100 transition text-[9px] text-slate-400 hover:text-teal-700 bg-white/80 rounded px-0.5 shadow-sm"
-                                >
-                                  🎨
-                                </button>
-                              </div>
-                            </td>
-                          `;
-                        }).join('')}
-                        <td class="no-print p-1">
-                          <div class="flex items-center justify-center gap-1">
-                            <button type="button" onclick="duplicateProject('${proj.id}')" title="複製" class="text-slate-500 hover:text-slate-800 text-xs px-1">複製</button>
-                            <button type="button" onclick="deleteProject('${proj.id}')" title="刪除" class="text-rose-600 hover:text-rose-800 text-xs px-1 font-bold">刪除</button>
-                          </div>
-                        </td>
-                      </tr>
-                    `;
-                  }).join('')}
-                </tbody>
-              </table>
+            <div class="p-3 sm:p-4">
+              <!-- 甘特圖視覺化條列 -->
+              ${generateGanttChartHTML(curProj)}
             </div>
           </section>
 
-          <!-- 模組二：標準單頁週報卡片 (Full Report，支援貼圖、表格與防變形) -->
+          <!-- 模組二：標準單頁週報卡片 -->
           <section id="section-detail" class="${viewMode === 'master' || viewMode === 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border-2 border-teal-800 overflow-hidden">
             <div class="bg-teal-800 text-white p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
-                <span class="bg-white/20 text-white text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded flex-shrink-0">Weekly Report</span>
-                <input
-                  type="text"
-                  value="NPI Project (${curProj.fixture || '治具名稱'}) - ${curProj.phase || '階段'}"
-                  onblur="commitFixtureTitle('${curProj.id}', this.value)"
-                  class="bg-transparent font-bold text-base sm:text-lg text-white border-b border-transparent hover:border-white/50 focus:border-white focus:outline-none flex-1 min-w-[200px]"
-                />
-                <div class="flex items-center gap-1 text-xs bg-teal-900 border border-teal-600 px-2 py-1 rounded-md text-teal-200">
-                  <span>週報日期:</span>
-                  <input 
-                    type="date" 
-                    value="${weeklyReportDate}" 
-                    onchange="updateWeeklyDate(this.value)" 
-                    class="bg-transparent text-white font-bold text-xs focus:outline-none cursor-pointer" 
-                  />
-                </div>
+                <span class="bg-white/20 text-white text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded">Weekly Report</span>
+                <span class="font-bold text-base text-white">${curProj.fixture || '治具名稱'} (${curProj.phase || '階段'})</span>
               </div>
-
-              <div class="no-print flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
-                <div class="flex items-center gap-1.5 flex-1 sm:flex-initial">
-                  <span class="text-xs text-teal-200 hidden md:inline">切換治具：</span>
-                  <select onchange="selectProject(this.value)" class="bg-teal-900 text-white text-xs px-2 py-1.5 rounded border border-teal-700 focus:outline-none w-full sm:w-auto">
-                    ${(projects || []).map(p => `<option value="${p.id}" ${p.id === curProj.id ? 'selected' : ''}>${p.fixture || '未命名治具'} (${p.phase || 'N/A'})</option>`).join('')}
-                  </select>
-                </div>
-                <button type="button" onclick="deleteProject('${curProj.id}')" class="text-xs bg-rose-600 hover:bg-rose-700 text-white px-2.5 py-1.5 rounded transition flex-shrink-0">刪除</button>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="openEmailCopyModal()" class="text-xs bg-white text-teal-900 font-bold px-3 py-1 rounded shadow hover:bg-teal-50 transition">✉️ 複製直向郵件格式</button>
               </div>
             </div>
 
-            <div class="p-3 sm:p-4 md:p-6 space-y-4 text-xs">
-              <!-- 1. Stakeholders -->
-              <div class="border border-slate-300 rounded-lg overflow-hidden">
-                <div class="grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-slate-300">
-                  <div class="md:col-span-2 bg-slate-100 font-bold p-2 text-slate-700 flex items-center text-[11px] sm:text-xs">Customer/CM</div>
-                  <div class="md:col-span-4 p-1.5"><input type="text" value="${curProj.customer || ''}" placeholder="客戶代號 / 工廠" onblur="commitField('${curProj.id}', 'customer', this.value)" class="w-full p-1 bg-transparent focus:bg-slate-50 rounded" /></div>
-                  <div class="md:col-span-2 bg-slate-100 font-bold p-2 text-slate-700 flex items-center text-[11px] sm:text-xs border-t md:border-t-0 border-slate-300">Contact (Customer)</div>
-                  <div class="md:col-span-4 p-1.5"><input type="text" value="${curProj.contact_customer || ''}" placeholder="DRI - 聯絡人" onblur="commitField('${curProj.id}', 'contact_customer', this.value)" class="w-full p-1 bg-transparent focus:bg-slate-50 rounded" /></div>
+            <div class="p-4 space-y-4 text-xs">
+              <!-- 歷程週記 -->
+              <div class="border border-slate-300 rounded-lg p-3">
+                <div class="font-bold text-slate-800 mb-2 text-xs flex justify-between items-center">
+                  <span>Project Progress (歷程日誌，支援直接貼上截圖與表格)</span>
+                  <button type="button" onclick="addLog('${curProj.id}')" class="text-teal-700 font-semibold">+ 新增週次日誌</button>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-12 border-t border-slate-300 divide-y md:divide-y-0 md:divide-x divide-slate-300">
-                  <div class="md:col-span-2 bg-slate-100 font-bold p-2 text-slate-700 flex items-center text-[11px] sm:text-xs">Competitor</div>
-                  <div class="md:col-span-4 p-1.5"><input type="text" value="${curProj.competitor || 'NA'}" onblur="commitField('${curProj.id}', 'competitor', this.value)" class="w-full p-1 bg-transparent focus:bg-slate-50 rounded" /></div>
-                  <div class="md:col-span-2 bg-slate-100 font-bold p-2 text-slate-700 flex items-center text-[11px] sm:text-xs border-t md:border-t-0 border-slate-300">TT Resources</div>
-                  <div class="md:col-span-4 p-1.5"><input type="text" value="${curProj.tt_resources || ''}" placeholder="AM / PM / RD / ME 名單" onblur="commitField('${curProj.id}', 'tt_resources', this.value)" class="w-full p-1 bg-transparent focus:bg-slate-50 rounded" /></div>
-                </div>
-              </div>
-
-              <!-- 2. Demand & PO/PR 查核矩陣 -->
-              <div class="border border-slate-300 rounded-lg overflow-hidden">
-                <div class="bg-slate-100 px-3 py-2 font-bold text-slate-800 border-b border-slate-300 flex items-center justify-between text-xs">
-                  <span>Demand & PO/PR 查核矩陣</span>
-                  <button type="button" onclick="addDemand('${curProj.id}')" class="no-print text-xs text-teal-700 hover:text-teal-900 font-semibold">+ 新增需求項</button>
-                </div>
-                <div class="overflow-x-auto touch-scroll">
-                  <table class="w-full text-center border-collapse min-w-[700px]">
-                    <thead>
-                      <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-[11px]">
-                        <th class="p-2 border-r border-slate-200 text-left pl-3">Demand 需求名稱</th>
-                        <th class="p-2 border-r border-slate-200 w-16">Qty</th>
-                        <th class="p-2 border-r border-slate-200 w-24">Site</th>
-                        <th class="p-2 border-r border-slate-200 w-20">ETD</th>
-                        <th class="p-2 border-r border-slate-200 w-20">ETA</th>
-                        <th class="p-2 border-r border-slate-200 w-14">DFM</th>
-                        <th class="p-2 border-r border-slate-200 w-14">Quote</th>
-                        <th class="p-2 border-r border-slate-200 w-16">PR/PO</th>
-                        <th class="p-2 border-r border-slate-200 w-14">K/O</th>
-                        <th class="p-2 border-r border-slate-200 w-14">BOM</th>
-                        <th class="p-2 border-r border-slate-200 w-14">SW Key</th>
-                        <th class="no-print p-2 w-12">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200">
-                      ${(curProj.demands || []).map(d => `
-                        <tr class="hover:bg-slate-50/70">
-                          <td class="p-1.5 border-r border-slate-200 text-left pl-2"><input type="text" value="${d.demand || ''}" placeholder="需求治具品名" onblur="commitDemand('${curProj.id}', '${d.id}', 'demand', this.value)" class="w-full p-1 bg-transparent focus:bg-white rounded" /></td>
-                          <td class="p-1 border-r border-slate-200"><input type="text" value="${d.qty || ''}" placeholder="1" onblur="commitDemand('${curProj.id}', '${d.id}', 'qty', this.value)" class="w-full text-center p-1 bg-transparent focus:bg-white rounded" /></td>
-                          <td class="p-1 border-r border-slate-200"><input type="text" value="${d.site || ''}" placeholder="廠區" onblur="commitDemand('${curProj.id}', '${d.id}', 'site', this.value)" class="w-full text-center p-1 bg-transparent focus:bg-white rounded" /></td>
-                          <td class="p-1 border-r border-slate-200"><input type="text" value="${d.etd || ''}" placeholder="出貨日" onblur="commitDemand('${curProj.id}', '${d.id}', 'etd', this.value)" class="w-full text-center p-1 bg-transparent focus:bg-white rounded" /></td>
-                          <td class="p-1 border-r border-slate-200"><input type="text" value="${d.eta || ''}" placeholder="到廠日" onblur="commitDemand('${curProj.id}', '${d.id}', 'eta', this.value)" class="w-full text-center p-1 bg-transparent focus:bg-white rounded text-rose-600 font-semibold" /></td>
-                          ${['dfm', 'quote', 'pr_po', 'ko', 'bom', 'sw_key'].map(fKey => `
-                            <td class="p-1 border-r border-slate-200"><input type="checkbox" ${d[fKey] ? 'checked' : ''} onchange="commitDemand('${curProj.id}', '${d.id}', '${fKey}', this.checked)" class="w-4 h-4 text-teal-600 rounded cursor-pointer" /></td>
-                          `).join('')}
-                          <td class="no-print p-1"><button type="button" onclick="deleteDemand('${curProj.id}', '${d.id}')" class="text-slate-400 hover:text-rose-600 p-1 font-bold">×</button></td>
-                        </tr>
-                      `).join('')}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <!-- 3. Schedule 說明 -->
-              <div class="border border-slate-300 rounded-lg p-2.5 sm:p-3 bg-slate-50/50">
-                <div class="font-bold text-slate-800 mb-1 text-xs">Schedule 時程重點</div>
-                <input type="text" value="${curProj.schedule_desc || ''}" placeholder="例如: 需求 11/4 ETA 交付工廠，數量 2 套" onblur="commitField('${curProj.id}', 'schedule_desc', this.value)" class="w-full p-2 bg-white border border-slate-300 rounded focus:ring-1 focus:ring-teal-500 focus:outline-none text-xs" />
-              </div>
-
-              <!-- 4. Project Progress (Process 週記日誌) -->
-              <div class="border border-slate-300 rounded-lg overflow-hidden">
-                <div class="bg-slate-100 px-3 py-2 font-bold text-slate-800 border-b border-slate-300 flex items-center justify-between text-xs">
-                  <span>Project Progress (Process 歷程日誌，支援直接貼上截圖與表格)</span>
-                  <button type="button" onclick="addLog('${curProj.id}')" class="no-print text-xs text-teal-700 hover:text-teal-900 font-semibold">+ 新增週次日誌</button>
-                </div>
-                <div class="p-2 sm:p-3 space-y-2.5 max-h-[380px] overflow-y-auto touch-scroll">
+                <div class="space-y-2.5">
                   ${(curProj.progress_logs || []).map(log => `
-                    <div class="border border-slate-200 rounded-lg p-2.5 sm:p-3 bg-slate-50/60 relative group">
-                      <div class="flex items-center justify-between mb-1.5">
-                        <div class="flex items-center gap-1.5 sm:gap-2">
-                          <span class="font-bold text-teal-800 bg-teal-100 px-2 py-0.5 rounded text-[11px]">-[${log.week}]</span>
-                          <input type="text" value="${log.week}" onblur="commitField('${curProj.id}', 'progress_logs', (curProj.progress_logs||[]).map(l=>l.id==='${log.id}'?{...l,week:this.value}:l))" class="text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded px-1.5 py-0.5 w-16 sm:w-20" />
-                        </div>
-                        <div class="no-print flex items-center gap-2">
-                          <button 
-                            type="button" 
-                            title="點擊上傳圖片附件"
-                            onclick="triggerImageUpload((b64) => appendImageToLog('${curProj.id}', '${log.id}', b64))"
-                            class="text-teal-700 hover:text-teal-900 text-xs px-1.5 py-0.5 rounded bg-white border border-slate-200 shadow-sm flex items-center gap-1"
-                          >📎 插入圖片</button>
-                          <button type="button" onclick="deleteLog('${curProj.id}', '${log.id}')" class="text-slate-400 hover:text-rose-600 text-xs px-2 py-0.5 rounded">刪除此週</button>
+                    <div class="border border-slate-200 rounded-lg p-2.5 bg-slate-50/60">
+                      <div class="flex justify-between items-center mb-1.5">
+                        <span class="font-bold text-teal-800 bg-teal-100 px-2 py-0.5 rounded text-[11px]">-[${log.week}]</span>
+                        <div class="flex items-center gap-2">
+                          <button type="button" onclick="triggerImageUpload((b64) => appendImageToLog('${curProj.id}', '${log.id}', b64))" class="text-teal-700 text-xs px-1.5 py-0.5 bg-white border border-slate-200 rounded">📎 插入圖片</button>
+                          <button type="button" onclick="deleteLog('${curProj.id}', '${log.id}')" class="text-slate-400 hover:text-rose-600 text-xs">刪除</button>
                         </div>
                       </div>
                       <div 
                         contenteditable="true"
-                        placeholder="請輸入文字，或直接按 Ctrl+V 貼上截圖、貼上 Excel 表格..."
+                        placeholder="請輸入文字，或直接按 Ctrl+V 貼上截圖..."
                         onpaste="handleRichPaste(event, () => commitLogHTML('${curProj.id}', '${log.id}', this.innerHTML))"
                         onblur="commitLogHTML('${curProj.id}', '${log.id}', this.innerHTML)"
                         class="rich-editor w-full text-xs p-2 bg-white border border-slate-300 rounded focus:ring-1 focus:ring-teal-500 text-slate-800"
@@ -1922,64 +1317,12 @@
                   `).join('')}
                 </div>
               </div>
-
-              <!-- Special Issue 與 To-do plan -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                <div class="border border-amber-300 bg-amber-50/30 rounded-lg p-2.5 sm:p-3">
-                  <div class="flex items-center justify-between mb-1.5">
-                    <div class="font-bold text-amber-900 text-xs">Special Issue / Highlight / Call Help</div>
-                    <button 
-                      type="button" 
-                      title="插入圖片"
-                      onclick="triggerImageUpload((b64) => appendImageToField('${curProj.id}', 'special_issue', b64))"
-                      class="no-print text-amber-800 hover:text-amber-950 text-[11px] px-1.5 py-0.5 bg-white/80 border border-amber-200 rounded shadow-sm"
-                    >📎 圖片</button>
-                  </div>
-                  <div 
-                    contenteditable="true"
-                    placeholder="請輸入事項，支援直接貼上截圖與表格..."
-                    onpaste="handleRichPaste(event, () => commitField('${curProj.id}', 'special_issue', this.innerHTML))"
-                    onblur="commitField('${curProj.id}', 'special_issue', this.innerHTML)"
-                    class="rich-editor w-full text-xs p-2 bg-white border border-amber-200 rounded focus:ring-1 focus:ring-amber-500 text-slate-800"
-                  >${curProj.special_issue || ''}</div>
-                </div>
-
-                <div class="border border-teal-300 bg-teal-50/30 rounded-lg p-2.5 sm:p-3">
-                  <div class="flex items-center justify-between mb-1.5">
-                    <div class="font-bold text-teal-900 text-xs">To-do plan（下週待辦行動方案）</div>
-                    <button 
-                      type="button" 
-                      title="插入圖片"
-                      onclick="triggerImageUpload((b64) => appendImageToField('${curProj.id}', 'todo_plan', b64))"
-                      class="no-print text-teal-800 hover:text-teal-950 text-[11px] px-1.5 py-0.5 bg-white/80 border border-teal-200 rounded shadow-sm"
-                    >📎 圖片</button>
-                  </div>
-                  <div 
-                    contenteditable="true"
-                    placeholder="請輸入待辦行動，支援直接貼上截圖與表格..."
-                    onpaste="handleRichPaste(event, () => commitField('${curProj.id}', 'todo_plan', this.innerHTML))"
-                    onblur="commitField('${curProj.id}', 'todo_plan', this.innerHTML)"
-                    class="rich-editor w-full text-xs p-2 bg-white border border-teal-200 rounded focus:ring-1 focus:ring-teal-500 text-slate-800"
-                  >${curProj.todo_plan || ''}</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="bg-slate-50 border-t border-slate-200 px-3 sm:px-4 py-2 flex items-center justify-between text-[11px] text-slate-500">
-              <span>Weekly Report System • ${currentTeam} • 報告日期: ${weeklyReportDate}</span>
-              <span>Page 1 of 1</span>
             </div>
           </section>
         `}
       `;
-
-      const updatedScrollContainer = document.getElementById('masterScrollContainer');
-      if (updatedScrollContainer && savedScrollLeft > 0) {
-        updatedScrollContainer.scrollLeft = savedScrollLeft;
-      }
     }
 
-    // 啟動身分檢查與頁面渲染
     if (checkAuth()) {
       initDataForCurrentTeam();
       renderApp();
