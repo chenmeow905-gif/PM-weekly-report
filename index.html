@@ -14,7 +14,7 @@
       margin: 8mm 6mm;
     }
     @media print {
-      .no-print, #loginOverlay, #cellColorPalette, #emailCopyModal {
+      .no-print, #loginOverlay, #cellColorPalette, #emailCopyModal, #inlineFormatBar {
         display: none !important;
       }
       body {
@@ -35,11 +35,9 @@
         page-break-after: always !important;
         break-after: page !important;
       }
-      table {
-        page-break-inside: auto !important;
-      }
-      tr {
+      table, tr, td, th, .avoid-break {
         page-break-inside: avoid !important;
+        break-inside: avoid !important;
       }
       .rich-editor img {
         max-width: 280px !important;
@@ -77,7 +75,7 @@
       }
     }
 
-    /* 編輯器基礎樣式 */
+    /* 富文字編輯器樣式 */
     .rich-editor {
       min-height: 48px;
       outline: none;
@@ -117,7 +115,7 @@
       box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
 
-    /* 專用直向郵件樣式（字體 12pt，符合 Outlook） */
+    /* 郵件直向專用排版 */
     .email-container {
       font-size: 12pt !important;
       font-family: Calibri, Arial, "Microsoft JhengHei", sans-serif !important;
@@ -143,6 +141,18 @@
 <body class="bg-slate-100 text-slate-800 min-h-screen antialiased">
 
   <input type="file" id="globalImageUploader" accept="image/*" class="hidden" onchange="handleFileSelected(event)" />
+
+  <!-- 浮動文字顏色選擇工具列 -->
+  <div id="inlineFormatBar" class="hidden fixed z-50 bg-white border border-slate-300 rounded-lg shadow-xl p-1.5 flex items-center gap-1.5 text-xs transition-opacity">
+    <span class="text-[11px] font-bold text-slate-500 pl-1">文字色彩:</span>
+    <button type="button" onmousedown="applyTextColor('#0f172a', event)" class="w-5 h-5 rounded bg-slate-900 border border-slate-400" title="黑色"></button>
+    <button type="button" onmousedown="applyTextColor('#e11d48', event)" class="w-5 h-5 rounded bg-rose-600 border border-rose-700" title="紅色"></button>
+    <button type="button" onmousedown="applyTextColor('#2563eb', event)" class="w-5 h-5 rounded bg-blue-600 border border-blue-700" title="藍色"></button>
+    <button type="button" onmousedown="applyTextColor('#059669', event)" class="w-5 h-5 rounded bg-emerald-600 border border-emerald-700" title="綠色"></button>
+    <button type="button" onmousedown="applyTextColor('#d97706', event)" class="w-5 h-5 rounded bg-amber-600 border border-amber-700" title="橘色"></button>
+    <div class="h-4 w-px bg-slate-200 mx-0.5"></div>
+    <input type="color" onchange="applyTextColor(this.value, event)" class="w-6 h-5 rounded cursor-pointer border border-slate-300 bg-transparent p-0" title="自訂色彩" />
+  </div>
 
   <!-- 登入遮罩 -->
   <div id="loginOverlay" style="position: fixed; inset: 0; z-index: 99999; display: flex; align-items: center; justify-content: center; background-color: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); padding: 16px; pointer-events: auto;">
@@ -193,42 +203,42 @@
   <!-- 主系統容器 -->
   <div id="app" class="w-full flex flex-col p-2 sm:p-4 md:p-6 max-w-[1700px] mx-auto gap-4 sm:gap-6"></div>
 
-  <!-- 浮動調色盤 -->
+  <!-- 浮動里程碑儲存格調色盤 -->
   <div id="cellColorPalette" class="hidden fixed z-50 bg-white border border-slate-300 rounded-xl shadow-2xl p-3 w-72 text-xs transition-all">
     <div class="flex items-center justify-between border-b border-slate-200 pb-2 mb-2.5">
       <div class="font-bold text-slate-800 flex items-center gap-1.5">
-        <span>🎨</span><span>設定醒目標示與文字顏色</span>
+        <span>🎨</span><span>設定儲存格醒目標籤與字色</span>
       </div>
       <button onclick="closeColorPalette()" class="text-slate-400 hover:text-slate-700 font-bold px-1 text-sm">✕</button>
     </div>
     <div class="mb-3">
-      <div class="text-[11px] font-semibold text-slate-500 mb-1.5">快速醒目預設 (底色 + 字色)：</div>
+      <div class="text-[11px] font-semibold text-slate-500 mb-1.5">快速預設 (底色 + 字色)：</div>
       <div class="grid grid-cols-3 gap-1.5 text-center">
-        <button onclick="applyPresetColor('#dbeafe', '#1e40af')" class="p-1 rounded bg-blue-100 text-blue-800 font-bold border border-blue-200">藍色 (需求/DFM)</button>
-        <button onclick="applyPresetColor('#fef3c7', '#92400e')" class="p-1 rounded bg-amber-100 text-amber-800 font-bold border border-amber-200">黃色 (採購/備料)</button>
-        <button onclick="applyPresetColor('#ffedd5', '#9a3412')" class="p-1 rounded bg-orange-100 text-orange-800 font-bold border border-orange-200">橙色 (組裝/調適)</button>
-        <button onclick="applyPresetColor('#d1fae5', '#065f46')" class="p-1 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">綠色 (完成/Pass)</button>
-        <button onclick="applyPresetColor('#ffe4e6', '#9f1239')" class="p-1 rounded bg-rose-100 text-rose-800 font-bold border border-rose-200">紅色 (延遲/異常)</button>
-        <button onclick="applyPresetColor('#f3e8ff', '#6b21a8')" class="p-1 rounded bg-purple-100 text-purple-800 font-bold border border-purple-200">紫色 (KO/BOM)</button>
+        <button onclick="applyPresetColor('#dbeafe', '#1e40af')" class="p-1 rounded bg-blue-100 text-blue-800 font-bold border border-blue-200">藍色</button>
+        <button onclick="applyPresetColor('#fef3c7', '#92400e')" class="p-1 rounded bg-amber-100 text-amber-800 font-bold border border-amber-200">黃色</button>
+        <button onclick="applyPresetColor('#ffedd5', '#9a3412')" class="p-1 rounded bg-orange-100 text-orange-800 font-bold border border-orange-200">橙色</button>
+        <button onclick="applyPresetColor('#d1fae5', '#065f46')" class="p-1 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">綠色</button>
+        <button onclick="applyPresetColor('#ffe4e6', '#9f1239')" class="p-1 rounded bg-rose-100 text-rose-800 font-bold border border-rose-200">紅色</button>
+        <button onclick="applyPresetColor('#f3e8ff', '#6b21a8')" class="p-1 rounded bg-purple-100 text-purple-800 font-bold border border-purple-200">紫色</button>
       </div>
     </div>
     <div class="space-y-2 border-t border-slate-200 pt-2.5">
       <div class="flex items-center justify-between">
-        <span class="text-slate-600 font-medium">自訂醒目底色:</span>
+        <span class="text-slate-600 font-medium">自訂底色:</span>
         <input type="color" id="pickerBg" onchange="applyCustomBg(this.value)" class="w-8 h-6 rounded cursor-pointer border border-slate-300" />
       </div>
       <div class="flex items-center justify-between">
-        <span class="text-slate-600 font-medium">自訂文字顏色:</span>
+        <span class="text-slate-600 font-medium">自訂字色:</span>
         <input type="color" id="pickerText" onchange="applyCustomText(this.value)" class="w-8 h-6 rounded cursor-pointer border border-slate-300" />
       </div>
     </div>
     <div class="border-t border-slate-200 pt-2.5 mt-2.5 flex items-center justify-between">
-      <button onclick="clearCustomColor()" class="text-rose-600 hover:text-rose-800 font-medium text-[11px]">🔄 清除顏色 (預設)</button>
+      <button onclick="clearCustomColor()" class="text-rose-600 hover:text-rose-800 font-medium text-[11px]">🔄 清除顏色</button>
       <button onclick="closeColorPalette()" class="bg-teal-700 hover:bg-teal-800 text-white font-medium px-2.5 py-1 rounded text-xs">完成</button>
     </div>
   </div>
 
-  <!-- 郵件直向複製彈窗 (字體 12pt • 甘特圖) -->
+  <!-- 郵件直向複製彈窗 -->
   <div id="emailCopyModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
     <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden">
       <div class="p-3 sm:p-4 bg-teal-800 text-white flex items-center justify-between">
@@ -307,6 +317,7 @@
     let currentTeam = urlParams.get('team') || urlParams.get('group') || '';
     currentTeam = currentTeam.replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, '').trim();
 
+    // 基準週次
     const DEFAULT_WEEKS = [
       { "id": "w1", "week": "WK32", "month": "Aug-26", "date": "8/3" },
       { "id": "w2", "week": "WK33", "month": "Aug-26", "date": "8/10" },
@@ -332,6 +343,7 @@
       { "id": "w22", "week": "WK53", "month": "Dec-26", "date": "12/28" }
     ];
 
+    // 同步您最新 2026-11-06 備份檔之專案內容（包含已清除左側 li 黑點之日誌）
     const JANE_INITIAL_PROJECTS = [
       {
         "id": "proj_nnv1",
@@ -344,26 +356,36 @@
         "deadline": "PO pending",
         "pm": "Jane",
         "tpe_rd": "Eliot",
-        "tt_ee": "曉勇/迪良/遠照",
-        "me": "Ｍark",
+        "tt_ee": "X",
+        "me": "曉勇/迪良/遠照",
         "sw": "X",
         "fae": "X",
         "milestones": {
-          "w13": { "text": "需求確認", "bg": "#dbeafe", "color": "#1e40af" },
-          "w14": { "text": "DFM Lock", "bg": "#dbeafe", "color": "#1e40af" }
+          "w11": "",
+          "w12": { "text": "Project kickoff", "bg": "#f3e8ff", "color": "#6b21a8" },
+          "w13": { "text": "Requirements Clarification", "bg": "#dbeafe", "color": "#1e40af" },
+          "w14": { "text": "DFM Lock", "bg": "#dbeafe", "color": "#1e40af" },
+          "w15": { "text": "Priority kick-off for risk materials", "bg": "#fef3c7", "color": "#92400e" },
+          "w16": "Est. PO Kickoff",
+          "w17": "Est. Material Preparation",
+          "w18": "Est. Material Preparation",
+          "w19": "Est. Material Readiness",
+          "w20": "Est. TT Shipment",
+          "w21": "Est. TW Tuning",
+          "w22": "Est. PO Shipment"
         },
         "customer": "Lenovo / Wistron湖口",
         "contact_customer": "Sam Ju",
         "competitor": "NA",
-        "tt_resources": "AM: Jasmine, PM: Jane, RD: Eliot, ME: Mark",
+        "tt_resources": "AM: Jasmine, PM: Jane, RD: Eliot, ME: 曉勇/迪良/遠照",
         "demands": [
           {
             "id": "d2_1",
             "demand": "Rack #1(支援PDB/TPM/BMC/FIO)",
             "qty": "1",
             "site": "Wistron湖口",
-            "etd": "PO pending",
-            "eta": "-",
+            "etd": "12/26",
+            "eta": "12/E",
             "dfm": true,
             "quote": false,
             "pr_po": false,
@@ -376,8 +398,8 @@
             "demand": "Rack #2 (支援 TPM/BMC/FIO)",
             "qty": "1",
             "site": "Wistron湖口",
-            "etd": "PO pending",
-            "eta": "-",
+            "etd": "12/26",
+            "eta": "12/E",
             "dfm": true,
             "quote": false,
             "pr_po": false,
@@ -389,14 +411,19 @@
         "schedule_desc": "待客戶確認需求下單，以利廠內先行備料。",
         "progress_logs": [
           {
+            "id": "log_1793944565486",
+            "week": "WK46",
+            "content": "<div>1. Rack layout & positioning internal discussion (Done)</div><div>2. Risk material preparation (Due: 12/7)</div><div>3. BOM release to system (Due: 11/11)</div>"
+          },
+          {
             "id": "log_1793686201288",
             "week": "WK45",
-            "content": "1. DFM更新完成。<br>2. 備料清單整理完成。"
+            "content": "<div>1. DFM update completed.</div><div>2. Risk materials preparation list finalized.</div>"
           },
           {
             "id": "log_2_44",
             "week": "WK44",
-            "content": "1. 3D變動與電路圖已確認。<br>2. 與客戶concall確認變動需求及相關資訊。"
+            "content": "<div>1. 3D design changes & schematics confirmed.</div><div>2. Conducted customer concall to align on change requests and related details.</div>"
           }
         ],
         "special_issue": "- 目前無重大卡點 (N/A)",
@@ -404,6 +431,7 @@
       }
     ];
 
+    // 同步您最新 2026-11-06 備份檔之日報內容
     const JANE_INITIAL_DAILY = [
       {
         "no": 1,
@@ -546,6 +574,49 @@
         selectedId = id; 
         renderApp(); 
       } 
+    }
+
+    /* ---------------- 全域反白文字選取工具列與色彩變更 ---------------- */
+    let currentSavedRange = null;
+    function checkSelection(e) {
+      const selection = window.getSelection();
+      const formatBar = document.getElementById('inlineFormatBar');
+      if (!selection.isCollapsed && selection.toString().trim() !== '') {
+        const range = selection.getRangeAt(0);
+        let container = range.commonAncestorContainer;
+        while (container && container.nodeType !== 1) container = container.parentNode;
+        if (container && container.closest('.rich-editor')) {
+          currentSavedRange = range.cloneRange();
+          const rect = range.getBoundingClientRect();
+          formatBar.style.left = `${Math.max(10, rect.left + window.scrollX)}px`;
+          formatBar.style.top = `${Math.max(10, rect.top + window.scrollY - 38)}px`;
+          formatBar.classList.remove('hidden');
+          return;
+        }
+      }
+      if (!e.target.closest('#inlineFormatBar')) {
+        formatBar.classList.add('hidden');
+      }
+    }
+
+    document.addEventListener('mouseup', checkSelection);
+    document.addEventListener('keyup', checkSelection);
+
+    function applyTextColor(color, event) {
+      if (event) event.preventDefault();
+      if (currentSavedRange) {
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(currentSavedRange);
+        document.execCommand('foreColor', false, color);
+        saveActiveEditorContent();
+      }
+    }
+
+    function saveActiveEditorContent() {
+      document.querySelectorAll('.rich-editor').forEach(el => {
+        el.dispatchEvent(new Event('blur'));
+      });
     }
 
     /* ---------------- 全域貼上監聽：防 Outlook 變形與表格支援 ---------------- */
@@ -789,15 +860,10 @@
       }
     }
 
-    /* ---------------- 【動態全覆蓋精緻甘特圖】 ----------------
-       1. 完整涵蓋專案中所有有標記內容的週次（無任何裁切或遺漏）
-       2. 當專案週次跨度較長時，採用緊湊精緻排版（table-layout: fixed），
-          縮小 padding 並保持字級適中，完整顯示每項文字與色彩膠囊
-    ----------------------------------------------------------- */
+    /* ---------------- 【動態全覆蓋精緻甘特圖】 ---------------- */
     function generateGanttChartHTML(proj) {
       if (!proj) return '';
 
-      // 1. 找出專案中所有有設定進度的週次索引
       const activeIndices = [];
       weeks.forEach((w, idx) => {
         const m = (proj.milestones && proj.milestones[w.id]);
@@ -807,7 +873,6 @@
         }
       });
 
-      // 2. 自動計算包含「所有有標記週次」的完整跨度
       let startIdx = 0;
       let endIdx = weeks.length;
       if (activeIndices.length > 0) {
@@ -825,7 +890,6 @@
       const colCount = Math.max(1, ganttWeeks.length);
       const colWidthPercent = (100 / colCount).toFixed(2);
 
-      // 3. 根據週數自動微調字級與內距，確保再多週數都能精緻清晰
       const isCompact = colCount > 8;
       const weekFontSize = isCompact ? '9.5pt' : '10.5pt';
       const dateFontSize = isCompact ? '7.5pt' : '8.5pt';
@@ -1010,7 +1074,7 @@
         const textBlob = new Blob([htmlContent.replace(/<[^>]+>/g, '')], { type: 'text/plain' });
         const item = new ClipboardItem({ 'text/html': blob, 'text/plain': textBlob });
         navigator.clipboard.write([item]).then(() => {
-          alert('✅ 已成功複製直向 12pt 郵件格式（含精緻甘特圖）！請直接在 Outlook 按 Ctrl+V 貼上。');
+          alert('✅ 已成功複製直向 12pt 郵件格式（含甘特圖重點）！請直接在 Outlook 按 Ctrl+V 貼上。');
           closeEmailCopyModal();
         }).catch(err => {
           fallbackCopyText(htmlContent);
@@ -1076,12 +1140,16 @@
       downloadTableAsExcel(reportHtml, `Daily_Report_${currentTeam || 'Group'}_${dailyReportDate}.xls`);
     }
 
-    /* ---------------- PDF 匯出 ---------------- */
+    /* ---------------- PDF 匯出（防跨頁裁切優化版） ---------------- */
     function downloadWeeklyReportPDF() {
       try {
         const reportHtml = generateEmailPortraitHTML();
         const tempContainer = document.createElement('div');
         tempContainer.innerHTML = reportHtml;
+        tempContainer.querySelectorAll('table, .avoid-break, div').forEach(node => {
+          node.style.pageBreakInside = 'avoid';
+          node.style.breakInside = 'avoid';
+        });
         document.body.appendChild(tempContainer);
 
         const opt = {
@@ -1113,6 +1181,10 @@
         const reportHtml = generateEmailPortraitHTML();
         const tempContainer = document.createElement('div');
         tempContainer.innerHTML = reportHtml;
+        tempContainer.querySelectorAll('table, .avoid-break, div').forEach(node => {
+          node.style.pageBreakInside = 'avoid';
+          node.style.breakInside = 'avoid';
+        });
         document.body.appendChild(tempContainer);
 
         const opt = {
@@ -1363,8 +1435,6 @@
               saveState();
               renderApp();
               alert(`✅ 備份資料已成功還原！`);
-            } else {
-              alert('❌ 檔案格式不符合！');
             }
           } catch(err) {
             alert('❌ 讀取失敗: ' + err.message);
@@ -1386,7 +1456,7 @@
 
       const app = document.getElementById('app');
       app.innerHTML = `
-        <!-- 頂部導航列 (以前熟悉的完整操作工具列) -->
+        <!-- 頂部導航列 -->
         <header class="no-print bg-white rounded-xl shadow-sm border border-slate-200 p-3 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-teal-700 flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-sm flex-shrink-0">PM</div>
@@ -1421,7 +1491,6 @@
                 <button type="button" onclick="setViewMode('daily')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'daily' ? 'bg-teal-700 text-white shadow-sm font-bold' : 'text-teal-700 font-bold hover:bg-slate-200'}">📋 Daily Report</button>
               </div>
 
-              <!-- 專用：複製直向 12pt 郵件格式（含精緻甘特圖） -->
               <button type="button" onclick="openEmailCopyModal()" title="一鍵複製最適合 Outlook 的直向甘特圖格式" class="bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-1">
                 <span>✉️</span><span>複製郵件格式</span>
               </button>
@@ -1454,7 +1523,7 @@
           </div>
         ` : `
           <!-- 模組三：Daily Report -->
-          <section id="section-daily" class="${viewMode !== 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border-2 border-teal-700 overflow-hidden">
+          <section id="section-daily" class="${viewMode !== 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border-2 border-teal-700 overflow-hidden avoid-break">
             <div class="p-3 sm:p-4 bg-teal-800 text-white flex flex-wrap items-center justify-between gap-3">
               <div class="flex items-center gap-3">
                 <span class="bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded">Daily Sheet</span>
@@ -1541,7 +1610,7 @@
           </section>
 
           <!-- 模組一：總排程主表 (完全保留原有的大表樣式) -->
-          <section id="section-master" class="${viewMode === 'detail' || viewMode === 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden page-break">
+          <section id="section-master" class="${viewMode === 'detail' || viewMode === 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden page-break avoid-break">
             <div class="p-3 sm:p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
               <div class="flex items-center gap-2 flex-wrap">
                 <div class="w-2.5 h-4 sm:h-5 bg-teal-600 rounded"></div>
@@ -1674,7 +1743,7 @@
           </section>
 
           <!-- 模組二：標準單頁週報卡片 -->
-          <section id="section-detail" class="${viewMode === 'master' || viewMode === 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border-2 border-teal-800 overflow-hidden">
+          <section id="section-detail" class="${viewMode === 'master' || viewMode === 'daily' ? 'hidden' : ''} bg-white rounded-xl shadow-sm border-2 border-teal-800 overflow-hidden avoid-break">
             <div class="bg-teal-800 text-white p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
                 <span class="bg-white/20 text-white text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded">Weekly Report</span>
@@ -1704,7 +1773,7 @@
 
             <div class="p-3 sm:p-4 md:p-6 space-y-4 text-xs">
               <!-- 1. Stakeholders -->
-              <div class="border border-slate-300 rounded-lg overflow-hidden">
+              <div class="border border-slate-300 rounded-lg overflow-hidden avoid-break">
                 <div class="grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-slate-300">
                   <div class="md:col-span-2 bg-slate-100 font-bold p-2 text-slate-700 flex items-center text-[11px] sm:text-xs">Customer/CM</div>
                   <div class="md:col-span-4 p-1.5"><input type="text" value="${curProj.customer || ''}" placeholder="客戶代號 / 工廠" onblur="commitField('${curProj.id}', 'customer', this.value)" class="w-full p-1 bg-transparent focus:bg-slate-50 rounded" /></div>
@@ -1720,7 +1789,7 @@
               </div>
 
               <!-- 2. Demand & PO/PR 查核矩陣 -->
-              <div class="border border-slate-300 rounded-lg overflow-hidden">
+              <div class="border border-slate-300 rounded-lg overflow-hidden avoid-break">
                 <div class="bg-slate-100 px-3 py-2 font-bold text-slate-800 border-b border-slate-300 flex items-center justify-between text-xs">
                   <span>Demand & PO/PR 查核矩陣</span>
                   <button type="button" onclick="addDemand('${curProj.id}')" class="no-print text-xs text-teal-700 hover:text-teal-900 font-semibold">+ 新增需求項</button>
@@ -1763,20 +1832,20 @@
               </div>
 
               <!-- 3. Schedule 說明 -->
-              <div class="border border-slate-300 rounded-lg p-2.5 sm:p-3 bg-slate-50/50">
+              <div class="border border-slate-300 rounded-lg p-2.5 sm:p-3 bg-slate-50/50 avoid-break">
                 <div class="font-bold text-slate-800 mb-1 text-xs">Schedule 時程重點</div>
                 <input type="text" value="${curProj.schedule_desc || ''}" placeholder="例如: 需求 11/4 ETA 交付工廠，數量 2 套" onblur="commitField('${curProj.id}', 'schedule_desc', this.value)" class="w-full p-2 bg-white border border-slate-300 rounded focus:ring-1 focus:ring-teal-500 focus:outline-none text-xs" />
               </div>
 
               <!-- 4. Project Progress (Process 歷程日誌) -->
-              <div class="border border-slate-300 rounded-lg overflow-hidden">
+              <div class="border border-slate-300 rounded-lg overflow-hidden avoid-break">
                 <div class="bg-slate-100 px-3 py-2 font-bold text-slate-800 border-b border-slate-300 flex items-center justify-between text-xs">
                   <span>Project Progress (Process 歷程日誌)</span>
                   <button type="button" onclick="addLog('${curProj.id}')" class="no-print text-xs text-teal-700 hover:text-teal-900 font-semibold">+ 新增週次日誌</button>
                 </div>
                 <div class="p-2 sm:p-3 space-y-2.5 max-h-[380px] overflow-y-auto touch-scroll">
                   ${(curProj.progress_logs || []).map(log => `
-                    <div class="border border-slate-200 rounded-lg p-2.5 sm:p-2.5 bg-slate-50/60 relative group">
+                    <div class="border border-slate-200 rounded-lg p-2.5 sm:p-2.5 bg-slate-50/60 relative group avoid-break">
                       <div class="flex items-center justify-between mb-1.5">
                         <div class="flex items-center gap-1.5 sm:gap-2">
                           <span class="font-bold text-teal-800 bg-teal-100 px-2 py-0.5 rounded text-[11px]">-[${log.week}]</span>
@@ -1789,7 +1858,7 @@
                       </div>
                       <div 
                         contenteditable="true"
-                        placeholder="請輸入文字，支援直接貼上截圖與表格..."
+                        placeholder="請輸入文字，支援反白改顏色、直接貼上截圖與表格..."
                         onpaste="handleRichPaste(event, () => commitLogHTML('${curProj.id}', '${log.id}', this.innerHTML))"
                         onblur="commitLogHTML('${curProj.id}', '${log.id}', this.innerHTML)"
                         class="rich-editor w-full text-xs p-2 bg-white border border-slate-300 rounded focus:ring-1 focus:ring-teal-500 text-slate-800"
@@ -1800,12 +1869,12 @@
               </div>
 
               <!-- Special Issue 與 To-do plan -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 avoid-break">
                 <div class="border border-amber-300 bg-amber-50/30 rounded-lg p-2.5 sm:p-3">
-                  <div class="font-bold text-amber-900 text-xs">Special Issue / Highlight / Call Help</div>
+                  <div class="font-bold text-amber-900 mb-1 text-xs">Special Issue / Highlight / Call Help</div>
                   <div 
                     contenteditable="true"
-                    placeholder="請輸入事項，支援直接貼上截圖與表格..."
+                    placeholder="請輸入事項，支援反白改顏色..."
                     onpaste="handleRichPaste(event, () => commitField('${curProj.id}', 'special_issue', this.innerHTML))"
                     onblur="commitField('${curProj.id}', 'special_issue', this.innerHTML)"
                     class="rich-editor w-full text-xs p-2 bg-white border border-amber-200 rounded focus:ring-1 focus:ring-amber-500 text-slate-800"
@@ -1813,10 +1882,10 @@
                 </div>
 
                 <div class="border border-teal-300 bg-teal-50/30 rounded-lg p-2.5 sm:p-3">
-                  <div class="font-bold text-teal-900 text-xs">To-do plan（下週待辦行動方案）</div>
+                  <div class="font-bold text-teal-900 mb-1 text-xs">To-do plan（下週待辦行動方案）</div>
                   <div 
                     contenteditable="true"
-                    placeholder="請輸入待辦行動，支援直接貼上截圖與表格..."
+                    placeholder="請輸入待辦行動，支援反白改顏色..."
                     onpaste="handleRichPaste(event, () => commitField('${curProj.id}', 'todo_plan', this.innerHTML))"
                     onblur="commitField('${curProj.id}', 'todo_plan', this.innerHTML)"
                     class="rich-editor w-full text-xs p-2 bg-white border border-teal-200 rounded focus:ring-1 focus:ring-teal-500 text-slate-800"
