@@ -368,12 +368,97 @@
 
     function cleanHtmlString(str) {
       if (!str) return '';
-      return String(str)
+      const basic = String(str)
         .replace(/<\/?(?:ul|ol)[^>]*>/gi, '')
         .replace(/<li[^>]*>/gi, '<div>')
         .replace(/<\/li>/gi, '</div>')
         .replace(/<p[^>]*>/gi, '<div>')
         .replace(/<\/p>/gi, '</div>');
+      // 沒有任何標籤的純文字不需要再處理
+      if (basic.indexOf('<') === -1) return basic;
+      return sanitizeRichHTML(basic);
+    }
+
+    /* ---------------- 格式清理：只保留文字、字色、粗斜底線、表格與圖片 ----------------
+     * 從網頁 / Gemini / Outlook 貼上時常夾帶大量隱藏格式（自訂標籤、_ngcontent 屬性、
+     * white-space、caret-color、字級等），會讓檔案變大、排版不一致。這裡統一清掉。 */
+    const RICH_ALLOWED_TAGS = new Set(['DIV', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'SPAN', 'FONT', 'SUB', 'SUP', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TD', 'TH', 'IMG']);
+    const RICH_BLOCK_TO_DIV = new Set(['P', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'PRE', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER']);
+    const RICH_KEEP_STYLES = ['color', 'background-color', 'font-weight', 'font-style', 'text-decoration-line', 'text-decoration'];
+    const RICH_IMG_STYLE = 'max-width:100% !important; width:auto !important; height:auto !important; max-height:220px !important; object-fit:contain !important; border-radius:6px; margin:4px 0; border:1px solid #cbd5e1;';
+
+    function sanitizeRichHTML(html) {
+      if (!html) return '';
+      let doc;
+      try { doc = new DOMParser().parseFromString(String(html), 'text/html'); } catch (e) { return String(html); }
+      const root = doc.body;
+      if (!root) return '';
+      root.querySelectorAll('script, style, meta, link, title, iframe, object, embed, svg, math, noscript, template, button, input, select, textarea, form, video, audio, canvas').forEach(n => n.remove());
+
+      const unwrap = el => {
+        const frag = doc.createDocumentFragment();
+        while (el.firstChild) frag.appendChild(el.firstChild);
+        el.replaceWith(frag);
+      };
+
+      const walk = node => {
+        [...node.childNodes].forEach(child => {
+          if (child.nodeType === 8) { child.remove(); return; }          // 註解（例如 <!--StartFragment-->）
+          if (child.nodeType === 3) {                                     // 文字：去掉零寬字元
+            if (child.nodeValue.indexOf('​') !== -1) child.nodeValue = child.nodeValue.replace(/​/g, '');
+            return;
+          }
+          if (child.nodeType !== 1) { child.remove(); return; }
+          walk(child);
+
+          let el = child;
+          let tag = el.tagName;
+          if (RICH_BLOCK_TO_DIV.has(tag)) {
+            const d = doc.createElement('div');
+            if (el.getAttribute('style')) d.setAttribute('style', el.getAttribute('style'));
+            while (el.firstChild) d.appendChild(el.firstChild);
+            el.replaceWith(d);
+            el = d; tag = 'DIV';
+          }
+          if (!RICH_ALLOWED_TAGS.has(tag)) { unwrap(el); return; }
+
+          const keep = {};
+          if (tag === 'FONT' && el.getAttribute('color')) keep.color = el.getAttribute('color');
+          if (tag === 'IMG') {
+            const src = el.getAttribute('src') || '';
+            if (!/^(data:image\/|https?:)/i.test(src)) { el.remove(); return; }
+            keep.src = src;
+            keep.alt = 'attachment';
+          }
+          if (tag === 'TD' || tag === 'TH') {
+            ['colspan', 'rowspan'].forEach(a => { if (el.getAttribute(a)) keep[a] = el.getAttribute(a); });
+          }
+          const styles = [];
+          if (tag !== 'IMG') {
+            RICH_KEEP_STYLES.forEach(prop => {
+              const v = el.style.getPropertyValue(prop);
+              if (!v) return;
+              if (prop === 'font-weight' && !(/bold|[6-9]00/.test(v))) return;          // 只保留粗體
+              if (prop === 'font-style' && v !== 'italic') return;
+              if ((prop === 'text-decoration' || prop === 'text-decoration-line') && !/underline|line-through/.test(v)) return;
+              if (prop === 'background-color' && /^(transparent|rgba\(0, 0, 0, 0\)|initial|inherit)$/.test(v)) return;
+              if (prop === 'color' && /^(inherit|initial|currentcolor|black|#000|#000000|rgb\(0, 0, 0\))$/i.test(v)) return;   // 預設黑色不需要另外存
+              if (prop === 'text-decoration' && styles.some(x => x.startsWith('text-decoration-line'))) return;
+              styles.push(`${prop}: ${v}`);
+            });
+          }
+          [...el.attributes].forEach(a => el.removeAttribute(a.name));
+          Object.entries(keep).forEach(([k, v]) => el.setAttribute(k, v));
+          if (tag === 'IMG') el.setAttribute('style', RICH_IMG_STYLE);
+          else if (styles.length) el.setAttribute('style', styles.join('; '));
+
+          // 沒有任何格式的 span / font 直接拆掉；沒有內容的粗體、斜體等也刪掉
+          if ((tag === 'SPAN' || tag === 'FONT') && !el.attributes.length) { unwrap(el); return; }
+          if (['B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'SPAN', 'FONT', 'SUB', 'SUP'].includes(tag) && !el.textContent.trim() && !el.querySelector('img, br')) el.remove();
+        });
+      };
+      walk(root);
+      return root.innerHTML;
     }
 
     const JANE_INITIAL_PROJECTS = [
@@ -575,6 +660,7 @@
       } catch (e) {
         console.warn('LocalStorage load error:', e);
       }
+      try { normalizeAllRichContent(); } catch (e) { console.warn('normalize error', e); }
       selectedId = (projects && projects[0]) ? projects[0].id : '';
     }
 
@@ -750,10 +836,10 @@
       }
 
       const htmlText = clipboardData.getData('text/html');
-      if (htmlText && (htmlText.indexOf('<table') !== -1 || htmlText.indexOf('<tr') !== -1 || htmlText.indexOf('<li') !== -1)) {
+      if (htmlText) {
         e.preventDefault();
         const cleaned = cleanHtmlString(htmlText);
-        document.execCommand('insertHTML', false, cleaned);
+        document.execCommand('insertHTML', false, cleaned || clipboardData.getData('text/plain') || '');
         if (onSaveCallback) onSaveCallback();
       }
     }
@@ -1690,6 +1776,20 @@
       initDataForCurrentTeam();
     }
 
+    // 把所有可編輯的文字內容跑一次格式清理（讀取 / 匯入時使用）
+    const RICH_PROJECT_FIELDS = ['project', 'fixture', 'customer', 'cm', 'location', 'phase', 'status', 'deadline', 'pm', 'me', 'tpe_rd', 'tt_ee', 'sw', 'fae', 'contact_customer', 'competitor', 'tt_resources', 'schedule_desc', 'special_issue', 'todo_plan'];
+    function normalizeAllRichContent() {
+      (projects || []).forEach(p => {
+        RICH_PROJECT_FIELDS.forEach(k => { if (typeof p[k] === 'string') p[k] = cleanHtmlString(p[k]); });
+        (p.progress_logs || []).forEach(l => { l.content = cleanHtmlString(l.content); });
+        (p.demands || []).forEach(d => ['demand', 'qty', 'site', 'etd', 'eta'].forEach(k => { if (typeof d[k] === 'string') d[k] = cleanHtmlString(d[k]); }));
+      });
+      (dailyReports || []).forEach(d => {
+        d.actions = (d.actions || []).map(a => cleanHtmlString(a));
+        ['project', 'checkpoint'].forEach(k => { if (typeof d[k] === 'string') d[k] = cleanHtmlString(d[k]); });
+      });
+    }
+
     /* ---------- 補充的小型資料操作 ---------- */
     function commitDemandQuiet(projId, demandId, field, val) {
       projects = projects.map(p => {
@@ -1797,6 +1897,7 @@
         projects = data.projects;
         if (Array.isArray(data.weeks) && data.weeks.length) weeks = data.weeks;
         if (Array.isArray(data.dailyReports)) dailyReports = data.dailyReports;
+        normalizeAllRichContent();
         if (data.weeklyReportDate) weeklyReportDate = data.weeklyReportDate;
         if (data.dailyReportDate) dailyReportDate = data.dailyReportDate;
         selectedId = projects[0] ? projects[0].id : '';
@@ -1846,7 +1947,7 @@
             <div class="flex items-start gap-3">
               <div class="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center font-black shrink-0">PM</div>
               <div class="space-y-1.5">
-                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM 專案管理系統 <span class="ml-1 align-middle rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold">版本 v1107-B</span></h1>
+                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM 專案管理系統 <span class="ml-1 align-middle rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold">版本 v1107-C</span></h1>
                 <div class="flex flex-wrap items-center gap-2">
                   <div class="flex items-center gap-1 rounded-full bg-white text-slate-800 pl-3 pr-1 py-0.5 shadow-sm border border-teal-200">
                     <span class="text-xs font-bold text-teal-800 whitespace-nowrap">🏷️ 組別:</span>
@@ -2186,4 +2287,4 @@
   </script>
 </body>
 </html>
-<!-- END OF FILE v1107-B：看到這行代表檔案完整 -->
+<!-- END OF FILE v1107-C：看到這行代表檔案完整 -->
