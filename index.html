@@ -121,6 +121,12 @@
       box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
 
+    /* 單行可改字色欄位 */
+    .rich-editor.rich-field {
+      min-height: 34px;
+      white-space: normal;
+    }
+
     /* 郵件直向專用排版 */
     .email-container {
       font-size: 12pt !important;
@@ -150,7 +156,7 @@
   <input type="file" id="backupImporter" accept=".json,application/json" class="hidden" onchange="importBackupFile(event)" />
 
   <!-- 浮動反白選色工具列 (最高層級與防失焦保護) -->
-  <div id="inlineFormatBar" style="z-index: 999999; display: none;" class="fixed bg-white border border-slate-300 rounded-lg shadow-2xl p-1.5 flex items-center gap-1.5 text-xs transition-opacity">
+  <div id="inlineFormatBar" style="z-index: 999999; display: none;" class="absolute bg-white border border-slate-300 rounded-lg shadow-2xl p-1.5 flex items-center gap-1.5 text-xs transition-opacity">
     <span class="text-[11px] font-bold text-slate-500 pl-1">文字色彩:</span>
     <button type="button" onmousedown="applyTextColor('#0f172a', event)" class="w-5 h-5 rounded bg-slate-900 border border-slate-400 hover:scale-110 transition" title="黑色"></button>
     <button type="button" onmousedown="applyTextColor('#e11d48', event)" class="w-5 h-5 rounded bg-rose-600 border border-rose-700 hover:scale-110 transition" title="紅色"></button>
@@ -211,7 +217,7 @@
   <div id="app" class="w-full flex flex-col p-2 sm:p-4 md:p-6 max-w-[1700px] mx-auto gap-4 sm:gap-6"></div>
 
   <!-- 浮動里程碑儲存格調色盤 -->
-  <div id="cellColorPalette" class="hidden fixed z-50 bg-white border border-slate-300 rounded-xl shadow-2xl p-3 w-72 text-xs transition-all">
+  <div id="cellColorPalette" class="hidden absolute z-50 bg-white border border-slate-300 rounded-xl shadow-2xl p-3 w-72 text-xs transition-all">
     <div class="flex items-center justify-between border-b border-slate-200 pb-2 mb-2.5">
       <div class="font-bold text-slate-800 flex items-center gap-1.5">
         <span>🎨</span><span>設定儲存格醒目標籤與字色</span>
@@ -1482,6 +1488,73 @@
       return esc(String(v == null ? '' : v).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
     }
 
+    function plain(html) {
+      const d = document.createElement('div');
+      d.innerHTML = html == null ? '' : String(html);
+      return (d.textContent || '').trim();
+    }
+
+    // 單行文字欄位（可選取文字改字色；Enter 完成編輯）
+    function richField(content, onSaveJs, placeholder = '', extraCls = '') {
+      const save = onSaveJs.replace(/__VAL__/g, 'this.innerHTML');
+      return `<div class="rich-editor rich-field ${extraCls} rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
+          contenteditable="true" placeholder="${esc(placeholder)}"
+          onkeydown="if (event.key === 'Enter') { event.preventDefault(); this.blur(); }"
+          onblur="${save}" onpaste="handleRichPaste(event, () => { ${save} })">${content || ''}</div>`;
+    }
+
+    // 只有內容真的有變才存檔；需要時重繪（避免點按鈕時畫面被重繪而按不到）
+    function commitRichField(projId, field, html, rerender) {
+      const p = projects.find(x => x.id === projId);
+      if (!p || (p[field] || '') === cleanHtmlString(html)) return;
+      commitField(projId, field, html);
+      if (rerender) renderApp();
+    }
+
+    function commitDemandRich(projId, demandId, field, html) {
+      const v = cleanHtmlString(html);
+      const p = projects.find(x => x.id === projId);
+      const d = p && (p.demands || []).find(x => x.id === demandId);
+      if (!d || (d[field] || '') === v) return;
+      commitDemandQuiet(projId, demandId, field, v);
+    }
+
+    function commitDailyRich(idx, field, html) {
+      const v = cleanHtmlString(html);
+      if (!dailyReports[idx] || (dailyReports[idx][field] || '') === v) return;
+      updateDailyProject(idx, field, v);
+    }
+
+    /* ---------- 組別重新命名 ---------- */
+    const TEAM_KEY_PREFIXES = ['PM_SYSTEM_ACTIVE_PROJECTS_', 'PM_SYSTEM_ACTIVE_WEEKS_', 'PM_SYSTEM_ACTIVE_DAILY_', 'PM_SYSTEM_ACTIVE_DATE_', 'PM_SYSTEM_ACTIVE_WEEKLY_DATE_'];
+
+    function renameTeam() {
+      if (!currentTeam) return;
+      saveActiveEditorContent();
+      const input = prompt(`請輸入「${currentTeam}」的新組別名稱：`, currentTeam);
+      if (input == null) return;
+      const newName = input.replace(/[^a-zA-Z0-9_\-一-龥]/g, '').trim();
+      if (!newName) { alert('組別名稱只能使用中文、英文、數字、底線 _ 或連字號 -。'); return; }
+      if (newName === currentTeam) return;
+      if (getKnownTeams().includes(newName) && !confirm(`組別「${newName}」已經存在。確定要用「${currentTeam}」的資料覆蓋它嗎？（「${newName}」原本的資料會被取代）`)) return;
+      saveState();
+      try {
+        TEAM_KEY_PREFIXES.forEach(pre => {
+          const v = localStorage.getItem(pre + currentTeam);
+          if (v !== null) {
+            localStorage.setItem(pre + newName, v);
+            localStorage.removeItem(pre + currentTeam);
+          }
+        });
+      } catch (e) {
+        alert('重新命名失敗：' + e.message);
+        return;
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.set('team', newName);
+      window.location.href = url.toString();
+    }
+
     function getKnownTeams() {
       const teams = new Set();
       try {
@@ -1542,7 +1615,7 @@
 
     function confirmDeleteProject(id) {
       const p = projects.find(x => x.id === id);
-      if (confirm(`確定要刪除專案「${(p && (p.project || p.fixture)) || ''}」嗎？`)) deleteProject(id);
+      if (confirm(`確定要刪除專案「${(p && plain(p.project || p.fixture)) || ''}」嗎？`)) deleteProject(id);
     }
 
     function confirmDeleteWeek(id) {
@@ -1660,20 +1733,25 @@
       return `
         <header class="no-print rounded-2xl bg-teal-800 text-white shadow-md px-4 py-3 sm:px-5 sm:py-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center font-black">PM</div>
-              <div>
-                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM Weekly Report 專案管理系統</h1>
-                <div class="text-xs text-teal-100">登入者：${esc(user)} • 組別：${esc(currentTeam || '-')}</div>
+            <div class="flex items-start gap-3">
+              <div class="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center font-black shrink-0">PM</div>
+              <div class="space-y-1.5">
+                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM 專案管理系統</h1>
+                <div class="flex flex-wrap items-center gap-2">
+                  <div class="flex items-center gap-1 rounded-full bg-white text-slate-800 pl-3 pr-1 py-0.5 shadow-sm border border-teal-200">
+                    <span class="text-xs font-bold text-teal-800 whitespace-nowrap">🏷️ 組別:</span>
+                    <select id="teamSelect" title="切換組別" class="bg-transparent text-sm font-bold text-slate-800 py-1 pr-1 focus:outline-none cursor-pointer" onchange="switchTeam(this.value)">
+                      ${teams.map(t => `<option value="${esc(t)}" ${t === currentTeam ? 'selected' : ''}>${esc(t)}</option>`).join('')}
+                    </select>
+                    <button type="button" title="重新命名組別" onclick="renameTeam()" class="w-7 h-7 rounded-full hover:bg-teal-50 text-sm">✏️</button>
+                    <button type="button" title="新增組別" onclick="promptNewTeam()" class="w-7 h-7 rounded-full hover:bg-teal-50 text-base font-black text-teal-800">＋</button>
+                  </div>
+                  <span class="text-xs text-teal-100">組別: ${esc(currentTeam || '-')} 專屬空間 (?team=${esc(currentTeam || '')}) ｜ 👤 ${esc(user)}</span>
+                </div>
               </div>
             </div>
             <div class="flex flex-wrap items-center gap-2">
               <div class="flex rounded-lg bg-teal-900/50 p-1">${tab('both', '全部')}${tab('weekly', '週報 Weekly')}${tab('daily', '日報 Daily')}</div>
-              <select class="rounded-lg bg-white text-slate-800 text-xs font-semibold px-2 py-1.5" title="切換組別"
-                onchange="if (this.value === '__new__') { this.value = '${jsq(currentTeam)}'; promptNewTeam(); } else { switchTeam(this.value); }">
-                ${teams.map(t => `<option value="${esc(t)}" ${t === currentTeam ? 'selected' : ''}>組別：${esc(t)}</option>`).join('')}
-                <option value="__new__">＋ 新增組別…</option>
-              </select>
               <select class="rounded-lg bg-white text-slate-800 text-xs font-semibold px-2 py-1.5" title="PDF 方向" onchange="setPdfOrientation(this.value)">
                 <option value="landscape" ${selectedPdfOrientation === 'landscape' ? 'selected' : ''}>PDF：橫向</option>
                 <option value="portrait" ${selectedPdfOrientation === 'portrait' ? 'selected' : ''}>PDF：直向</option>
@@ -1713,8 +1791,8 @@
           <tr class="${isSel ? 'bg-teal-50/60' : ''}">
             <td class="sticky-col-1 border border-slate-200 px-2 py-1 align-middle min-w-[150px] ${isSel ? 'bg-teal-50' : 'bg-slate-50'}">
               <button type="button" onclick="selectProject('${jsq(p.id)}')" class="text-left w-full">
-                <div class="text-xs font-bold ${isSel ? 'text-teal-800' : 'text-slate-800'}">${esc(p.project || '-')}</div>
-                <div class="text-[10px] text-slate-500 truncate max-w-[160px]">${esc(p.fixture || '')}</div>
+                <div class="text-xs font-bold ${isSel ? 'text-teal-800' : 'text-slate-800'}">${esc(plain(p.project) || '-')}</div>
+                <div class="text-[10px] text-slate-500 truncate max-w-[160px]">${esc(plain(p.fixture))}</div>
               </button>
             </td>
             ${cells}
@@ -1752,21 +1830,21 @@
       ['pm', 'PM'], ['me', 'ME'], ['tpe_rd', 'RD'], ['tt_ee', 'EE'],
       ['sw', 'SW'], ['fae', 'FAE'], ['contact_customer', '客戶窗口'], ['competitor', '競爭對手']
     ];
-    const RERENDER_FIELDS = ['project', 'fixture', 'phase', 'status', 'deadline', 'customer', 'cm', 'pm', 'me', 'tpe_rd'];
+    const RERENDER_FIELDS = ['project', 'fixture'];
 
     function renderProjectDetail(p) {
       if (!p) return '';
       const pid = jsq(p.id);
       const field = ([key, label]) => `
-        <label class="block">
+        <div>
           <span class="block text-[11px] font-bold text-slate-500 mb-0.5">${label}</span>
-          <input class="${INPUT}" value="${esc(p[key])}" onchange="commitField('${pid}', '${key}', this.value)${RERENDER_FIELDS.includes(key) ? '; renderApp()' : ''}" />
-        </label>`;
+          ${richField(p[key], `commitRichField('${pid}', '${key}', __VAL__, ${RERENDER_FIELDS.includes(key)})`)}
+        </div>`;
 
       const checks = [['dfm', 'DFM'], ['quote', '報價'], ['pr_po', 'PR/PO'], ['ko', 'KO'], ['bom', 'BOM'], ['sw_key', 'SW Key']];
       const demandRows = (p.demands || []).map(d => {
         const did = jsq(d.id);
-        const txt = (k, w) => `<td class="border border-slate-200 p-1 ${w}"><input class="w-full rounded px-1.5 py-1 text-sm focus:bg-teal-50 focus:outline-none" value="${esc(d[k])}" onchange="commitDemandQuiet('${pid}', '${did}', '${k}', this.value)" /></td>`;
+        const txt = (k, w) => `<td class="border border-slate-200 p-1 ${w}">${richField(d[k], `commitDemandRich('${pid}', '${did}', '${k}', __VAL__)`, '', 'border-transparent')}</td>`;
         return `
           <tr>
             ${txt('demand', 'min-w-[220px]')}${txt('qty', 'w-16')}${txt('site', 'min-w-[110px]')}${txt('etd', 'w-20')}${txt('eta', 'w-20')}
@@ -1795,7 +1873,7 @@
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div class="text-[11px] font-bold uppercase tracking-wide text-teal-700">專案明細</div>
-              <h3 class="text-lg font-bold text-slate-800">${esc(p.project || '-')} <span class="text-slate-500 font-semibold">(${esc(p.fixture || '')})</span></h3>
+              <h3 class="text-lg font-bold text-slate-800">${p.project || '-'} <span class="text-slate-500 font-semibold">(${p.fixture || ''})</span></h3>
             </div>
             <div class="flex flex-wrap gap-2 no-print">
               <button type="button" class="${BTN_GHOST}" onclick="duplicateProject('${pid}')">⧉ 複製專案</button>
@@ -1805,10 +1883,10 @@
 
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">${PROJECT_FIELDS.map(field).join('')}</div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <label class="block"><span class="block text-[11px] font-bold text-slate-500 mb-0.5">資源配置 (TT Resources)</span>
-              <input class="${INPUT}" value="${esc(p.tt_resources)}" onchange="commitField('${pid}', 'tt_resources', this.value)" /></label>
-            <label class="block"><span class="block text-[11px] font-bold text-slate-500 mb-0.5">時程說明</span>
-              <input class="${INPUT}" value="${esc(p.schedule_desc)}" onchange="commitField('${pid}', 'schedule_desc', this.value)" /></label>
+            <div><span class="block text-[11px] font-bold text-slate-500 mb-0.5">資源配置 (TT Resources)</span>
+              ${richField(p.tt_resources, `commitRichField('${pid}', 'tt_resources', __VAL__, false)`)}</div>
+            <div><span class="block text-[11px] font-bold text-slate-500 mb-0.5">時程說明</span>
+              ${richField(p.schedule_desc, `commitRichField('${pid}', 'schedule_desc', __VAL__, false)`)}</div>
           </div>
 
           <div>
@@ -1875,14 +1953,14 @@
             ${projects.map(p => `
               <button type="button" onclick="selectProject('${jsq(p.id)}')"
                 class="rounded-full px-3 py-1.5 text-xs font-bold border transition ${p.id === selectedId ? 'bg-teal-700 text-white border-teal-700' : 'bg-white text-slate-700 border-slate-300 hover:border-teal-600'}">
-                ${esc(p.project || '-')}<span class="font-normal opacity-80"> · ${esc(p.fixture || '')}</span>
+                ${esc(plain(p.project) || '-')}<span class="font-normal opacity-80"> · ${esc(plain(p.fixture))}</span>
               </button>`).join('')}
             <button type="button" class="${BTN_GHOST}" onclick="addNewProject()">＋ 新增專案</button>
             <button type="button" class="${BTN_GHOST}" onclick="addNewWeek()">＋ 新增一週</button>
           </div>
 
           ${renderMilestoneTable()}
-          <p class="text-[11px] text-slate-500 no-print">提示：點專案名稱可切換下方明細；格子右側 🎨 可設定底色與字色；週次與日期可直接點擊修改。</p>
+          <p class="text-[11px] text-slate-500 no-print">提示：點專案名稱可切換下方明細；格子右側 🎨 可設定底色與字色；週次與日期可直接點擊修改。其他欄位只要<b>反白選取文字</b>，就會出現「文字色彩」工具列。</p>
         </section>
         ${renderProjectDetail(cur)}`;
     }
@@ -1904,7 +1982,7 @@
         return `
           <tr class="${i % 2 ? 'bg-slate-50' : 'bg-white'} align-top">
             <td class="border border-slate-200 p-2 text-center font-bold text-slate-700 w-12">${esc(item.no)}</td>
-            <td class="border border-slate-200 p-2 w-40"><input class="${INPUT} font-bold text-teal-800" value="${esc(item.project)}" onchange="updateDailyProject(${i}, 'project', this.value)" /></td>
+            <td class="border border-slate-200 p-2 w-40">${richField(item.project, `commitDailyRich(${i}, 'project', __VAL__)`, '專案名稱', 'font-bold text-teal-800')}</td>
             <td class="border border-slate-200 p-2 min-w-[320px]">
               <div class="space-y-1.5">${actions}</div>
               <button type="button" class="mt-2 text-xs font-semibold text-teal-700 hover:underline no-print" onclick="addDailyAction(${i})">＋ 新增重點</button>
@@ -1914,7 +1992,7 @@
                 ${['Low', 'Medium', 'High'].map(r => `<option ${r === risk ? 'selected' : ''}>${r}</option>`).join('')}
               </select>
             </td>
-            <td class="border border-slate-200 p-2 w-32"><input class="${INPUT} text-center text-xs" value="${esc(item.checkpoint || 'Daily Check')}" onchange="updateDailyProject(${i}, 'checkpoint', this.value)" /></td>
+            <td class="border border-slate-200 p-2 w-32">${richField(item.checkpoint || 'Daily Check', `commitDailyRich(${i}, 'checkpoint', __VAL__)`, '', 'text-center text-xs')}</td>
             <td class="border border-slate-200 p-2 w-10 text-center no-print"><button type="button" class="text-slate-400 hover:text-rose-600" title="刪除此專案列" onclick="if (confirm('確定刪除這一列？')) deleteDailyProject(${i})">✕</button></td>
           </tr>`;
       }).join('');
