@@ -1,0 +1,1981 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PM weekly report 專案管理系統</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- html2pdf.js for Client-Side PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <style>
+    @page {
+      margin: 8mm 6mm;
+    }
+    @media print {
+      .no-print, #loginOverlay, #cellColorPalette, #emailCopyModal, #inlineFormatBar {
+        display: none !important;
+      }
+      body {
+        background: white !important;
+        color: #0f172a !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft JhengHei", sans-serif !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      #app {
+        max-width: 100% !important;
+        padding: 0 !important;
+        gap: 0 !important;
+      }
+      .page-break {
+        page-break-after: always !important;
+        break-after: page !important;
+      }
+      table, tr, td, th, .avoid-break {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      .rich-editor img {
+        max-width: 280px !important;
+        width: auto !important;
+        height: auto !important;
+        max-height: 180px !important;
+        object-fit: contain !important;
+        display: inline-block !important;
+      }
+    }
+    
+    .touch-scroll {
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+    ::-webkit-scrollbar { height: 6px; width: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    @media (max-width: 1024px) {
+      .sticky-col-1 {
+        position: sticky;
+        left: 0;
+        z-index: 10;
+        background-color: #f8fafc;
+        box-shadow: 2px 0 4px -1px rgba(0,0,0,0.06);
+      }
+      .sticky-col-header {
+        position: sticky;
+        left: 0;
+        z-index: 30;
+        background-color: #e2e8f0;
+        box-shadow: 2px 0 4px -1px rgba(0,0,0,0.08);
+      }
+    }
+
+    /* 富文字編輯器樣式：徹底禁用 list-style，去除任何黑點 */
+    .rich-editor, .rich-editor * {
+      list-style-type: none !important;
+      list-style: none !important;
+    }
+    .rich-editor {
+      min-height: 48px;
+      outline: none;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+    .rich-editor li {
+      display: block !important;
+    }
+    .rich-editor:empty:before {
+      content: attr(placeholder);
+      color: #94a3b8;
+      pointer-events: none;
+    }
+    .rich-editor table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 6px 0;
+      font-size: 11px;
+    }
+    .rich-editor table, .rich-editor th, .rich-editor td {
+      border: 1px solid #cbd5e1;
+      padding: 4px 6px;
+    }
+    .rich-editor th {
+      background-color: #f1f5f9;
+      font-weight: bold;
+    }
+    .rich-editor img {
+      max-width: 100% !important;
+      width: auto !important;
+      height: auto !important;
+      max-height: 220px !important;
+      object-fit: contain !important;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      margin: 4px 2px;
+      display: inline-block;
+      vertical-align: middle;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    /* 郵件直向專用排版 */
+    .email-container {
+      font-size: 12pt !important;
+      font-family: Calibri, Arial, "Microsoft JhengHei", sans-serif !important;
+      line-height: 1.5 !important;
+      color: #1e293b !important;
+    }
+    .email-container table {
+      font-size: 12pt !important;
+      border-collapse: collapse !important;
+      width: 100% !important;
+    }
+    .email-container th, .email-container td {
+      border: 1px solid #94a3b8 !important;
+      padding: 6px 10px !important;
+      font-size: 12pt !important;
+    }
+    .email-container th {
+      background-color: #0f766e !important;
+      color: #ffffff !important;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen antialiased">
+
+  <input type="file" id="globalImageUploader" accept="image/*" class="hidden" onchange="handleFileSelected(event)" />
+  <input type="file" id="backupImporter" accept=".json,application/json" class="hidden" onchange="importBackupFile(event)" />
+
+  <!-- 浮動反白選色工具列 (最高層級與防失焦保護) -->
+  <div id="inlineFormatBar" style="z-index: 999999; display: none;" class="fixed bg-white border border-slate-300 rounded-lg shadow-2xl p-1.5 flex items-center gap-1.5 text-xs transition-opacity">
+    <span class="text-[11px] font-bold text-slate-500 pl-1">文字色彩:</span>
+    <button type="button" onmousedown="applyTextColor('#0f172a', event)" class="w-5 h-5 rounded bg-slate-900 border border-slate-400 hover:scale-110 transition" title="黑色"></button>
+    <button type="button" onmousedown="applyTextColor('#e11d48', event)" class="w-5 h-5 rounded bg-rose-600 border border-rose-700 hover:scale-110 transition" title="紅色"></button>
+    <button type="button" onmousedown="applyTextColor('#2563eb', event)" class="w-5 h-5 rounded bg-blue-600 border border-blue-700 hover:scale-110 transition" title="藍色"></button>
+    <button type="button" onmousedown="applyTextColor('#059669', event)" class="w-5 h-5 rounded bg-emerald-600 border border-emerald-700 hover:scale-110 transition" title="綠色"></button>
+    <button type="button" onmousedown="applyTextColor('#d97706', event)" class="w-5 h-5 rounded bg-amber-600 border border-amber-700 hover:scale-110 transition" title="橘色"></button>
+    <div class="h-4 w-px bg-slate-200 mx-0.5"></div>
+    <input type="color" onmousedown="saveSelectionBeforeColor(event)" onchange="applyTextColor(this.value, event)" class="w-6 h-5 rounded cursor-pointer border border-slate-300 bg-transparent p-0" title="自訂色彩" />
+  </div>
+
+  <!-- 登入遮罩 -->
+  <div id="loginOverlay" style="position: fixed; inset: 0; z-index: 99999; display: flex; align-items: center; justify-content: center; background-color: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); padding: 16px; pointer-events: auto;">
+    <div style="background: #ffffff; width: 100%; max-width: 420px; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4); border: 1px solid #e2e8f0; overflow: hidden; pointer-events: auto;">
+      <div style="background-color: #0f766e; padding: 24px; text-align: center; color: white;">
+        <div style="width: 52px; height: 52px; background: rgba(255,255,255,0.15); border-radius: 12px; margin: 0 auto 12px auto; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 900;">
+          PM
+        </div>
+        <h2 style="font-size: 19px; font-weight: bold; margin: 0; letter-spacing: -0.5px;">PM 專案管理系統</h2>
+        <p style="font-size: 11.5px; color: #ccfbf1; margin: 4px 0 0 0;">請驗證身分以存取專案時程與日報資料</p>
+      </div>
+      <form id="loginForm" onsubmit="handleLoginSubmit(event)" style="padding: 24px;">
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 12px; font-weight: bold; color: #334155; margin-bottom: 6px;">使用者姓名</label>
+          <input 
+            type="text" 
+            id="loginUsername" 
+            placeholder="請輸入姓名 (例如: Jane)" 
+            value="Jane"
+            required 
+            style="width: 100%; font-size: 13.5px; padding: 10px 12px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; outline: none;"
+          />
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 12px; font-weight: bold; color: #334155; margin-bottom: 6px;">通關密碼</label>
+          <input 
+            type="password" 
+            id="loginPassword" 
+            placeholder="請輸入密碼 (預設: adsbu1)" 
+            required 
+            style="width: 100%; font-size: 13.5px; padding: 10px 12px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; outline: none;"
+          />
+        </div>
+        <div id="loginErrorMsg" style="display: none; font-size: 12px; font-weight: 600; color: #e11d48; background: #ffe4e6; padding: 8px 12px; border-radius: 6px; margin-bottom: 14px; text-align: center;"></div>
+        <button 
+          type="submit" 
+          style="width: 100%; background-color: #0f766e; color: white; font-weight: bold; font-size: 14px; padding: 12px; border-radius: 8px; border: none; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); transition: background 0.2s;"
+        >
+          🔐 登入系統
+        </button>
+      </form>
+      <div style="background: #f8fafc; padding: 10px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #64748b;">
+        內部專案控管系統 • 機密資料請勿外傳
+      </div>
+    </div>
+  </div>
+
+  <!-- 主系統容器 -->
+  <div id="app" class="w-full flex flex-col p-2 sm:p-4 md:p-6 max-w-[1700px] mx-auto gap-4 sm:gap-6"></div>
+
+  <!-- 浮動里程碑儲存格調色盤 -->
+  <div id="cellColorPalette" class="hidden fixed z-50 bg-white border border-slate-300 rounded-xl shadow-2xl p-3 w-72 text-xs transition-all">
+    <div class="flex items-center justify-between border-b border-slate-200 pb-2 mb-2.5">
+      <div class="font-bold text-slate-800 flex items-center gap-1.5">
+        <span>🎨</span><span>設定儲存格醒目標籤與字色</span>
+      </div>
+      <button onclick="closeColorPalette()" class="text-slate-400 hover:text-slate-700 font-bold px-1 text-sm">✕</button>
+    </div>
+    <div class="mb-3">
+      <div class="text-[11px] font-semibold text-slate-500 mb-1.5">快速預設 (底色 + 字色)：</div>
+      <div class="grid grid-cols-3 gap-1.5 text-center">
+        <button onclick="applyPresetColor('#dbeafe', '#1e40af')" class="p-1 rounded bg-blue-100 text-blue-800 font-bold border border-blue-200">藍色</button>
+        <button onclick="applyPresetColor('#fef3c7', '#92400e')" class="p-1 rounded bg-amber-100 text-amber-800 font-bold border border-amber-200">黃色</button>
+        <button onclick="applyPresetColor('#ffedd5', '#9a3412')" class="p-1 rounded bg-orange-100 text-orange-800 font-bold border border-orange-200">橙色</button>
+        <button onclick="applyPresetColor('#d1fae5', '#065f46')" class="p-1 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">綠色</button>
+        <button onclick="applyPresetColor('#ffe4e6', '#9f1239')" class="p-1 rounded bg-rose-100 text-rose-800 font-bold border border-rose-200">紅色</button>
+        <button onclick="applyPresetColor('#f3e8ff', '#6b21a8')" class="p-1 rounded bg-purple-100 text-purple-800 font-bold border border-purple-200">紫色</button>
+      </div>
+    </div>
+    <div class="space-y-2 border-t border-slate-200 pt-2.5">
+      <div class="flex items-center justify-between">
+        <span class="text-slate-600 font-medium">自訂底色:</span>
+        <input type="color" id="pickerBg" onchange="applyCustomBg(this.value)" class="w-8 h-6 rounded cursor-pointer border border-slate-300" />
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-slate-600 font-medium">自訂字色:</span>
+        <input type="color" id="pickerText" onchange="applyCustomText(this.value)" class="w-8 h-6 rounded cursor-pointer border border-slate-300" />
+      </div>
+    </div>
+    <div class="border-t border-slate-200 pt-2.5 mt-2.5 flex items-center justify-between">
+      <button onclick="clearCustomColor()" class="text-rose-600 hover:text-rose-800 font-medium text-[11px]">🔄 清除顏色</button>
+      <button onclick="closeColorPalette()" class="bg-teal-700 hover:bg-teal-800 text-white font-medium px-2.5 py-1 rounded text-xs">完成</button>
+    </div>
+  </div>
+
+  <!-- 郵件直向複製彈窗 -->
+  <div id="emailCopyModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="p-3 sm:p-4 bg-teal-800 text-white flex items-center justify-between">
+        <div>
+          <span class="font-bold text-base">直向郵件格式預覽（字體 12pt • 精緻甘特圖）</span>
+          <p class="text-xs text-teal-200 mt-0.5">保證涵蓋所有進度重點 • 點擊「複製郵件內容」後即可直接貼入 Outlook / Gmail</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="copyEmailHTMLToClipboard()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold shadow">📋 複製郵件內容</button>
+          <button type="button" onclick="closeEmailCopyModal()" class="text-white/80 hover:text-white text-lg font-bold px-2">✕</button>
+        </div>
+      </div>
+      <div class="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-50 touch-scroll" id="emailModalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    const AUTH_KEY = 'PM_AUTH_USER_SESSION_2026';
+    const CORRECT_PASS = 'adsbu1';
+
+    function getLoggedInUser() {
+      return sessionStorage.getItem(AUTH_KEY) || '';
+    }
+
+    function checkAuth() {
+      const user = getLoggedInUser();
+      const overlay = document.getElementById('loginOverlay');
+      if (!user) {
+        if (overlay) {
+          overlay.style.display = 'flex';
+          overlay.style.pointerEvents = 'auto';
+        }
+        return false;
+      } else {
+        if (overlay) {
+          overlay.style.display = 'none';
+          overlay.style.pointerEvents = 'none';
+        }
+        return true;
+      }
+    }
+
+    function handleLoginSubmit(e) {
+      e.preventDefault();
+      const userVal = document.getElementById('loginUsername').value.trim();
+      const passVal = document.getElementById('loginPassword').value.trim();
+      const errEl = document.getElementById('loginErrorMsg');
+
+      if (!userVal) {
+        errEl.innerText = '請輸入使用者姓名！';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      if (passVal !== CORRECT_PASS) {
+        errEl.innerText = '通關密碼錯誤，請重新輸入！';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      errEl.style.display = 'none';
+      sessionStorage.setItem(AUTH_KEY, userVal);
+      checkAuth();
+      initDataForCurrentTeam();
+      renderApp();
+    }
+
+    function handleLogout() {
+      if (confirm('確定要登出系統嗎？')) {
+        sessionStorage.removeItem(AUTH_KEY);
+        location.reload();
+      }
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentTeam = urlParams.get('team') || urlParams.get('group') || '';
+    currentTeam = currentTeam.replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, '').trim();
+
+    let selectedPdfOrientation = 'landscape';
+
+    const DEFAULT_WEEKS = [
+      { "id": "w1", "week": "WK32", "month": "Aug-26", "date": "8/3" },
+      { "id": "w2", "week": "WK33", "month": "Aug-26", "date": "8/10" },
+      { "id": "w3", "week": "WK34", "month": "Aug-26", "date": "8/17" },
+      { "id": "w4", "week": "WK35", "month": "Aug-26", "date": "8/24" },
+      { "id": "w5", "week": "WK36", "month": "Aug-26", "date": "8/31" },
+      { "id": "w6", "week": "WK37", "month": "Sep-26", "date": "9/7" },
+      { "id": "w7", "week": "WK38", "month": "Sep-26", "date": "9/14" },
+      { "id": "w8", "week": "WK39", "month": "Sep-26", "date": "9/21" },
+      { "id": "w9", "week": "WK40", "month": "Sep-26", "date": "9/28" },
+      { "id": "w10", "week": "WK41", "month": "Oct-26", "date": "10/5" },
+      { "id": "w11", "week": "WK42", "month": "Oct-26", "date": "10/12" },
+      { "id": "w12", "week": "WK43", "month": "Oct-26", "date": "10/19" },
+      { "id": "w13", "week": "WK44", "month": "Oct-26", "date": "10/26" },
+      { "id": "w14", "week": "WK45", "month": "Nov-26", "date": "11/2" },
+      { "id": "w15", "week": "WK46", "month": "Nov-26", "date": "11/9" },
+      { "id": "w16", "week": "WK47", "month": "Nov-26", "date": "11/16" },
+      { "id": "w17", "week": "WK48", "month": "Nov-26", "date": "11/23" },
+      { "id": "w18", "week": "WK49", "month": "Nov-26", "date": "11/30" },
+      { "id": "w19", "week": "WK50", "month": "Dec-26", "date": "12/7" },
+      { "id": "w20", "week": "WK51", "month": "Dec-26", "date": "12/14" },
+      { "id": "w21", "week": "WK52", "month": "Dec-26", "date": "12/21" },
+      { "id": "w22", "week": "WK53", "month": "Dec-26", "date": "12/28" }
+    ];
+
+    function cleanHtmlString(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/<\/?(?:ul|ol)[^>]*>/gi, '')
+        .replace(/<li[^>]*>/gi, '<div>')
+        .replace(/<\/li>/gi, '</div>')
+        .replace(/<p[^>]*>/gi, '<div>')
+        .replace(/<\/p>/gi, '</div>');
+    }
+
+    const JANE_INITIAL_PROJECTS = [
+      {
+        "id": "proj_nnv1",
+        "project": "ＷNV1",
+        "location": "TP",
+        "cm": "Wistron湖口",
+        "phase": "MP",
+        "fixture": "Vera Rubin NapaD BFT fixture",
+        "status": "設計",
+        "deadline": "PO pending",
+        "pm": "Jane",
+        "tpe_rd": "Eliot",
+        "tt_ee": "X",
+        "me": "曉勇/迪良/遠照",
+        "sw": "X",
+        "fae": "X",
+        "milestones": {
+          "w11": "",
+          "w12": { "text": "Project kickoff", "bg": "#f3e8ff", "color": "#6b21a8" },
+          "w13": { "text": "Requirements Clarification", "bg": "#dbeafe", "color": "#1e40af" },
+          "w14": { "text": "DFM Lock", "bg": "#dbeafe", "color": "#1e40af" },
+          "w15": { "text": "Priority kick-off for risk materials", "bg": "#fef3c7", "color": "#92400e" },
+          "w16": "Est. PO Kickoff",
+          "w17": "Est. Material Preparation",
+          "w18": "Est. Material Preparation",
+          "w19": "Est. Material Readiness",
+          "w20": "Est. TT Shipment",
+          "w21": "Est. TW Tuning",
+          "w22": "Est. PO Shipment"
+        },
+        "customer": "Lenovo / Wistron湖口",
+        "contact_customer": "Sam Ju",
+        "competitor": "NA",
+        "tt_resources": "AM: Jasmine, PM: Jane, RD: Eliot, ME: 曉勇/迪良/遠照",
+        "demands": [
+          {
+            "id": "d2_1",
+            "demand": "Rack #1(支援PDB/TPM/BMC/FIO)",
+            "qty": "1",
+            "site": "Wistron湖口",
+            "etd": "12/26",
+            "eta": "12/E",
+            "dfm": true,
+            "quote": false,
+            "pr_po": false,
+            "ko": false,
+            "bom": false,
+            "sw_key": false
+          },
+          {
+            "id": "d2_2",
+            "demand": "Rack #2 (支援 TPM/BMC/FIO)",
+            "qty": "1",
+            "site": "Wistron湖口",
+            "etd": "12/26",
+            "eta": "12/E",
+            "dfm": true,
+            "quote": false,
+            "pr_po": false,
+            "ko": false,
+            "bom": false,
+            "sw_key": false
+          }
+        ],
+        "schedule_desc": "待客戶確認需求下單，以利廠內先行備料。",
+        "progress_logs": [
+          {
+            "id": "log_1793944565486",
+            "week": "WK46",
+            "content": "<div>1. Rack layout & positioning internal discussion (Done)</div><div>2. Risk material preparation (Due: 12/7)</div><div>3. BOM release to system (Due: 11/11)</div>"
+          },
+          {
+            "id": "log_1793686201288",
+            "week": "WK45",
+            "content": "<div>1. DFM update completed.</div><div>2. Risk materials preparation list finalized.</div>"
+          },
+          {
+            "id": "log_2_44",
+            "week": "WK44",
+            "content": "<div>1. 3D design changes & schematics confirmed.</div><div>2. Conducted customer concall to align on change requests and related details.</div>"
+          }
+        ],
+        "special_issue": "- 目前無重大卡點 (N/A)",
+        "todo_plan": "1. 追蹤AM和客戶端正式下單需求。"
+      }
+    ];
+
+    const JANE_INITIAL_DAILY = [
+      {
+        "no": 1,
+        "project": "WNV1",
+        "actions": [
+          "客戶端需求（3D、電路及rack)已確認（Done)",
+          "已匯整儀器備料清單及庫存統計 （Done)",
+          "DFM (PDB/BFC/FIO/TPM)已更新 （Done)",
+          "待確認AM及客戶核准下單需求 (Daily)"
+        ],
+        "risk": "Low",
+        "checkpoint": "Daily Check"
+      },
+      {
+        "no": 2,
+        "project": "Other",
+        "actions": [
+          "Weekly Report System Development （Under continuous optimization)",
+          "Daily Report System Development （Under continuous optimization)",
+          "T1000C/T1000/T3000/SSTC box 核價 （11/6)"
+        ],
+        "risk": "Low",
+        "checkpoint": "Daily Check"
+      }
+    ];
+
+    function createBlankProject() {
+      return [{
+        "id": "proj_" + Date.now(),
+        "project": "新專案 #1",
+        "location": "TP",
+        "cm": "",
+        "phase": "",
+        "fixture": "治具名稱",
+        "status": "設計",
+        "deadline": "",
+        "pm": "",
+        "tpe_rd": "",
+        "tt_ee": "",
+        "me": "",
+        "sw": "",
+        "fae": "",
+        "milestones": {},
+        "customer": "",
+        "contact_customer": "",
+        "competitor": "NA",
+        "tt_resources": "",
+        "demands": [],
+        "schedule_desc": "",
+        "progress_logs": [],
+        "special_issue": "- 目前無重大卡點 (N/A)",
+        "todo_plan": ""
+      }];
+    }
+
+    function createBlankDaily() {
+      return [{
+        "no": 1,
+        "project": "待填寫專案項",
+        "actions": ["重點進度..."],
+        "risk": "Low",
+        "checkpoint": "Daily Check"
+      }];
+    }
+
+    let viewMode = 'both';
+    let weeks = DEFAULT_WEEKS;
+    let projects = [];
+    let dailyReports = [];
+    let dailyReportDate = '2026-11-04';
+    let weeklyReportDate = '2026-11-04';
+    let selectedId = '';
+
+    function initDataForCurrentTeam() {
+      if (!currentTeam) {
+        projects = [];
+        dailyReports = [];
+        selectedId = '';
+        return;
+      }
+
+      const STORAGE_KEY_PROJ = `PM_SYSTEM_ACTIVE_PROJECTS_${currentTeam}`;
+      const STORAGE_KEY_WEEK = `PM_SYSTEM_ACTIVE_WEEKS_${currentTeam}`;
+      const STORAGE_KEY_DAILY = `PM_SYSTEM_ACTIVE_DAILY_${currentTeam}`;
+      const STORAGE_KEY_DAILY_DATE = `PM_SYSTEM_ACTIVE_DATE_${currentTeam}`;
+      const STORAGE_KEY_WEEKLY_DATE = `PM_SYSTEM_ACTIVE_WEEKLY_DATE_${currentTeam}`;
+
+      try {
+        const storedProj = localStorage.getItem(STORAGE_KEY_PROJ);
+        projects = storedProj ? JSON.parse(storedProj) : ((currentTeam === 'Jane') ? JSON.parse(JSON.stringify(JANE_INITIAL_PROJECTS)) : createBlankProject());
+        projects.forEach(p => {
+          (p.progress_logs || []).forEach(l => l.content = cleanHtmlString(l.content));
+          p.special_issue = cleanHtmlString(p.special_issue);
+          p.todo_plan = cleanHtmlString(p.todo_plan);
+        });
+
+        const storedWeeks = localStorage.getItem(STORAGE_KEY_WEEK);
+        weeks = storedWeeks ? JSON.parse(storedWeeks) : DEFAULT_WEEKS;
+
+        const storedDaily = localStorage.getItem(STORAGE_KEY_DAILY);
+        dailyReports = storedDaily ? JSON.parse(storedDaily) : ((currentTeam === 'Jane') ? JSON.parse(JSON.stringify(JANE_INITIAL_DAILY)) : createBlankDaily());
+        dailyReports.forEach(d => {
+          d.actions = (d.actions || []).map(a => cleanHtmlString(a));
+        });
+
+        const storedDailyDate = localStorage.getItem(STORAGE_KEY_DAILY_DATE);
+        if (storedDailyDate) dailyReportDate = storedDailyDate;
+        const storedWeeklyDate = localStorage.getItem(STORAGE_KEY_WEEKLY_DATE);
+        if (storedWeeklyDate) weeklyReportDate = storedWeeklyDate;
+      } catch (e) {
+        console.warn('LocalStorage load error:', e);
+      }
+      selectedId = (projects && projects[0]) ? projects[0].id : '';
+    }
+
+    function saveState() {
+      if (!currentTeam) return;
+      try {
+        localStorage.setItem(`PM_SYSTEM_ACTIVE_PROJECTS_${currentTeam}`, JSON.stringify(projects));
+        localStorage.setItem(`PM_SYSTEM_ACTIVE_WEEKS_${currentTeam}`, JSON.stringify(weeks));
+        localStorage.setItem(`PM_SYSTEM_ACTIVE_DAILY_${currentTeam}`, JSON.stringify(dailyReports));
+        localStorage.setItem(`PM_SYSTEM_ACTIVE_DATE_${currentTeam}`, dailyReportDate);
+        localStorage.setItem(`PM_SYSTEM_ACTIVE_WEEKLY_DATE_${currentTeam}`, weeklyReportDate);
+      } catch (e) {}
+    }
+
+    function switchTeam(newTeam) {
+      if (newTeam === currentTeam) return;
+      saveState();
+      const newUrl = new URL(window.location.href);
+      if (newTeam) newUrl.searchParams.set('team', newTeam);
+      else newUrl.searchParams.delete('team');
+      window.location.href = newUrl.toString();
+    }
+
+    function promptNewTeam() {
+      const input = prompt('請輸入新組別名稱 (例如: NPI, Automation, Peter):', '');
+      if (input && input.trim()) switchTeam(input.trim());
+    }
+
+    function setViewMode(m) { 
+      viewMode = m; 
+      renderApp(); 
+    }
+    
+    function selectProject(id) { 
+      if (selectedId !== id) { 
+        selectedId = id; 
+        renderApp(); 
+      } 
+    }
+
+    /* ---------------- 全域反白文字選色機制 ---------------- */
+    let currentSavedRange = null;
+
+    function checkSelection(e) {
+      const selection = window.getSelection();
+      const formatBar = document.getElementById('inlineFormatBar');
+      if (!formatBar) return;
+      
+      if (!selection.isCollapsed && selection.toString().trim() !== '') {
+        const range = selection.getRangeAt(0);
+        let container = range.commonAncestorContainer;
+        while (container && container.nodeType !== 1) container = container.parentNode;
+        if (container && container.closest('.rich-editor')) {
+          currentSavedRange = range.cloneRange();
+          const rect = range.getBoundingClientRect();
+          formatBar.style.left = `${Math.max(10, rect.left + window.scrollX)}px`;
+          formatBar.style.top = `${Math.max(10, rect.top + window.scrollY - 48)}px`;
+          formatBar.style.display = 'flex';
+          return;
+        }
+      }
+      if (!e.target || !e.target.closest('#inlineFormatBar')) {
+        formatBar.style.display = 'none';
+      }
+    }
+
+    document.addEventListener('mouseup', checkSelection);
+    document.addEventListener('keyup', checkSelection);
+
+    function saveSelectionBeforeColor(event) {
+      const sel = window.getSelection();
+      if (!sel.isCollapsed && sel.rangeCount > 0) {
+        currentSavedRange = sel.getRangeAt(0).cloneRange();
+      }
+    }
+
+    function applyTextColor(color, event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      if (currentSavedRange) {
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(currentSavedRange);
+        document.execCommand('foreColor', false, color);
+        saveActiveEditorContent();
+      }
+    }
+
+    function saveActiveEditorContent() {
+      document.querySelectorAll('.rich-editor').forEach(el => {
+        el.dispatchEvent(new Event('blur'));
+      });
+    }
+
+    /* ---------------- 貼上過濾：徹底清除 li 黑點 ---------------- */
+    function handleRichPaste(e, onSaveCallback) {
+      const clipboardData = e.clipboardData || window.clipboardData;
+      if (!clipboardData) return;
+
+      if (clipboardData.items) {
+        for (let i = 0; i < clipboardData.items.length; i++) {
+          const item = clipboardData.items[i];
+          if (item.type.indexOf('image') !== -1) {
+            e.preventDefault();
+            const blob = item.getAsFile();
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+              insertImageAtCaret(evt.target.result);
+              if (onSaveCallback) onSaveCallback();
+            };
+            reader.readAsDataURL(blob);
+            return;
+          }
+        }
+      }
+
+      const htmlText = clipboardData.getData('text/html');
+      if (htmlText && (htmlText.indexOf('<table') !== -1 || htmlText.indexOf('<tr') !== -1 || htmlText.indexOf('<li') !== -1)) {
+        e.preventDefault();
+        const cleaned = cleanHtmlString(htmlText);
+        document.execCommand('insertHTML', false, cleaned);
+        if (onSaveCallback) onSaveCallback();
+      }
+    }
+
+    function insertImageAtCaret(base64) {
+      const imgHtml = `<img src="${base64}" alt="attachment" style="max-width:100% !important; width:auto !important; height:auto !important; max-height:220px !important; object-fit:contain !important; border-radius:6px; margin:4px 0; border:1px solid #cbd5e1;" />`;
+      document.execCommand('insertHTML', false, imgHtml);
+    }
+
+    let currentUploadCallback = null;
+    function triggerImageUpload(callback) {
+      currentUploadCallback = callback;
+      const fileInput = document.getElementById('globalImageUploader');
+      fileInput.value = '';
+      fileInput.click();
+    }
+
+    function handleFileSelected(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        if (currentUploadCallback) currentUploadCallback(evt.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // 調色盤邏輯
+    let activePaletteTarget = null;
+    function openColorPalette(projId, weekId, btnEl) {
+      const proj = projects.find(p => p.id === projId);
+      const mItem = (proj && proj.milestones && proj.milestones[weekId]) || '';
+      const curBg = (typeof mItem === 'object' && mItem.bg) ? mItem.bg : '#ffffff';
+      const curColor = (typeof mItem === 'object' && mItem.color) ? mItem.color : '#0f172a';
+      const inputEl = btnEl.parentElement.querySelector('input');
+      activePaletteTarget = { projId, weekId, inputEl };
+
+      document.getElementById('pickerBg').value = curBg.startsWith('#') ? curBg : '#dbeafe';
+      document.getElementById('pickerText').value = curColor.startsWith('#') ? curColor : '#1e40af';
+
+      const palette = document.getElementById('cellColorPalette');
+      palette.classList.remove('hidden');
+
+      const rect = btnEl.getBoundingClientRect();
+      let left = rect.left + window.scrollX - 260;
+      if (left < 10) left = 10;
+      let top = rect.bottom + window.scrollY + 6;
+      if (top + 280 > window.innerHeight + window.scrollY) {
+        top = rect.top + window.scrollY - 280;
+      }
+      palette.style.left = `${left}px`;
+      palette.style.top = `${top}px`;
+    }
+
+    function closeColorPalette() {
+      document.getElementById('cellColorPalette').classList.add('hidden');
+      activePaletteTarget = null;
+    }
+
+    function applyPresetColor(bgColor, textColor) {
+      if (!activePaletteTarget) return;
+      const { projId, weekId, inputEl } = activePaletteTarget;
+      updateMilestoneColor(projId, weekId, inputEl, bgColor, textColor);
+      document.getElementById('pickerBg').value = bgColor;
+      document.getElementById('pickerText').value = textColor;
+    }
+
+    function applyCustomBg(bgColor) {
+      if (!activePaletteTarget) return;
+      const { projId, weekId, inputEl } = activePaletteTarget;
+      const curColor = inputEl.style.color || '#0f172a';
+      updateMilestoneColor(projId, weekId, inputEl, bgColor, curColor);
+    }
+
+    function applyCustomText(textColor) {
+      if (!activePaletteTarget) return;
+      const { projId, weekId, inputEl } = activePaletteTarget;
+      const curBg = inputEl.style.backgroundColor || '#ffffff';
+      updateMilestoneColor(projId, weekId, inputEl, curBg, textColor);
+    }
+
+    function clearCustomColor() {
+      if (!activePaletteTarget) return;
+      const { projId, weekId, inputEl } = activePaletteTarget;
+      const proj = projects.find(p => p.id === projId);
+      const mItem = (proj && proj.milestones && proj.milestones[weekId]) || '';
+      const textVal = typeof mItem === 'object' ? (mItem.text || '') : mItem;
+      projects = projects.map(p => {
+        if (p.id !== projId) return p;
+        return { ...p, milestones: { ...(p.milestones || {}), [weekId]: textVal } };
+      });
+      saveState();
+      inputEl.style.backgroundColor = '';
+      inputEl.style.color = '';
+      inputEl.className = "w-full text-center text-[10px] leading-tight py-1 pr-3 focus:bg-white rounded font-medium";
+      liveColorBadge(inputEl);
+      closeColorPalette();
+    }
+
+    function updateMilestoneColor(projId, weekId, inputEl, bg, color) {
+      const val = inputEl.value;
+      projects = projects.map(p => {
+        if (p.id !== projId) return p;
+        return {
+          ...p,
+          milestones: { ...(p.milestones || {}), [weekId]: { text: val, bg: bg, color: color } }
+        };
+      });
+      saveState();
+      inputEl.className = "w-full text-center text-[10px] leading-tight py-1 pr-3 rounded font-bold";
+      inputEl.style.backgroundColor = bg;
+      inputEl.style.color = color;
+    }
+
+    function getMonthGroups() {
+      if (!weeks || weeks.length === 0) return [];
+      const groups = [];
+      let curMonth = weeks[0].month || 'Month';
+      let span = 0;
+      weeks.forEach((w, idx) => {
+        const m = w.month || 'Month';
+        if (m === curMonth) span++;
+        else {
+          groups.push({ month: curMonth, span });
+          curMonth = m;
+          span = 1;
+        }
+        if (idx === weeks.length - 1) groups.push({ month: curMonth, span });
+      });
+      return groups;
+    }
+
+    function updateWeeklyDate(val) {
+      weeklyReportDate = val;
+      saveState();
+      renderApp();
+    }
+
+    function updateDailyDate(val) {
+      dailyReportDate = val;
+      saveState();
+    }
+
+    function updateDailyProject(idx, field, val) {
+      dailyReports[idx][field] = val;
+      saveState();
+    }
+
+    function updateDailyActionHTML(projIdx, actIdx, htmlVal) {
+      dailyReports[projIdx].actions[actIdx] = cleanHtmlString(htmlVal);
+      saveState();
+    }
+
+    function appendImageToDailyAction(projIdx, actIdx, base64) {
+      const curContent = dailyReports[projIdx].actions[actIdx] || '';
+      const imgTag = `<br><img src="${base64}" alt="attachment" style="max-width:100% !important; width:auto !important; height:auto !important; max-height:220px !important; object-fit:contain !important; border-radius:6px; margin:4px 0; border:1px solid #cbd5e1;" />`;
+      dailyReports[projIdx].actions[actIdx] = curContent + imgTag;
+      saveState();
+      renderApp();
+    }
+
+    function addDailyAction(projIdx) {
+      dailyReports[projIdx].actions.push('新重點事項...');
+      saveState();
+      renderApp();
+    }
+
+    function deleteDailyAction(projIdx, actIdx) {
+      if (dailyReports[projIdx].actions.length <= 1) return;
+      dailyReports[projIdx].actions.splice(actIdx, 1);
+      saveState();
+      renderApp();
+    }
+
+    function addDailyProject() {
+      const newNo = dailyReports.length + 1;
+      dailyReports.push({
+        no: newNo,
+        project: `新專案 #${newNo}`,
+        actions: ['新重點事項...'],
+        risk: 'Low',
+        checkpoint: 'Daily Check'
+      });
+      saveState();
+      renderApp();
+    }
+
+    function deleteDailyProject(idx) {
+      if (dailyReports.length <= 1) return;
+      dailyReports.splice(idx, 1);
+      dailyReports.forEach((d, i) => d.no = i + 1);
+      saveState();
+      renderApp();
+    }
+
+    function resetDailyReport() {
+      if (confirm(`確定要將 [組別: ${currentTeam || '目前組別'}] 的 Daily Report 還原回預設範本嗎？`)) {
+        dailyReports = (currentTeam === 'Jane') ? JSON.parse(JSON.stringify(JANE_INITIAL_DAILY)) : createBlankDaily();
+        saveState();
+        renderApp();
+      }
+    }
+
+    /* ---------------- 【動態全覆蓋精緻甘特圖】 ---------------- */
+    function generateGanttChartHTML(proj) {
+      if (!proj) return '';
+
+      const activeIndices = [];
+      weeks.forEach((w, idx) => {
+        const m = (proj.milestones && proj.milestones[w.id]);
+        const textVal = m ? (typeof m === 'object' ? m.text : m) : '';
+        if (textVal && textVal.trim() !== '' && textVal.trim() !== '-') {
+          activeIndices.push(idx);
+        }
+      });
+
+      let startIdx = 0;
+      let endIdx = weeks.length;
+      if (activeIndices.length > 0) {
+        startIdx = Math.max(0, Math.min(...activeIndices) - 1);
+        endIdx = Math.min(weeks.length, Math.max(...activeIndices) + 2);
+        if (endIdx - startIdx < 5) {
+          endIdx = Math.min(weeks.length, startIdx + 5);
+        }
+      } else {
+        startIdx = Math.max(0, weeks.length - 8);
+        endIdx = weeks.length;
+      }
+
+      const ganttWeeks = weeks.slice(startIdx, endIdx);
+      const colCount = Math.max(1, ganttWeeks.length);
+      const colWidthPercent = (100 / colCount).toFixed(2);
+
+      const isCompact = colCount > 8;
+      const weekFontSize = isCompact ? '9.5pt' : '10.5pt';
+      const dateFontSize = isCompact ? '7.5pt' : '8.5pt';
+      const taskFontSize = isCompact ? '8.5pt' : '9.5pt';
+      const cellPadding = isCompact ? '4px 2px' : '6px 4px';
+      const taskPadding = isCompact ? '3px 2px' : '4px 5px';
+
+      const weekCols = ganttWeeks.map(w => {
+        const m = (proj.milestones && proj.milestones[w.id]);
+        const textVal = m ? (typeof m === 'object' ? m.text : m) : '';
+        const hasTask = textVal && textVal.trim() !== '' && textVal.trim() !== '-';
+        const bg = (m && typeof m === 'object' && m.bg) ? m.bg : '#dbeafe';
+        const col = (m && typeof m === 'object' && m.color) ? m.color : '#1e40af';
+
+        return `
+          <td style="width: ${colWidthPercent}%; border: 1px solid #cbd5e1; padding: ${cellPadding}; text-align: center; vertical-align: top; background: ${hasTask ? '#f0fdfa' : '#ffffff'}; word-break: break-word;">
+            <div style="font-size: ${weekFontSize}; font-weight: bold; color: ${hasTask ? '#0f766e' : '#475569'}; margin-bottom: 1px; line-height: 1.1;">${w.week}</div>
+            <div style="font-size: ${dateFontSize}; color: #94a3b8; margin-bottom: 5px; line-height: 1;">${w.date}</div>
+            ${hasTask ? `
+              <div style="background-color: ${bg}; color: ${col}; border-radius: 4px; padding: ${taskPadding}; font-size: ${taskFontSize}; font-weight: bold; line-height: 1.25; border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 1px 2px rgba(0,0,0,0.05); text-align: center;">
+                ${textVal}
+              </div>
+            ` : `
+              <div style="height: 4px; background-color: #e2e8f0; border-radius: 2px; margin: 10px auto 4px auto; width: 75%;"></div>
+            `}
+          </td>
+        `;
+      }).join('');
+
+      return `
+        <table style="width: 100%; border-collapse: collapse; table-layout: fixed; margin: 10px 0; background: #ffffff;">
+          <thead>
+            <tr style="background-color: #0f766e; color: #ffffff;">
+              <th colspan="${ganttWeeks.length}" style="border: 1px solid #0f766e; padding: 6px 10px; font-size: 11pt; text-align: left; font-weight: bold; background-color: #0f766e; color: #ffffff;">
+                📊 WK 週次時程甘特圖 (Gantt Timeline • 全涵蓋)
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>${weekCols}</tr>
+          </tbody>
+        </table>
+      `;
+    }
+
+    /* ---------------- 報表與郵件 HTML 生成（支援自適應方向） ---------------- */
+    function generateReportHTML(isForPrint = false) {
+      const curProj = (projects && projects.length > 0) ? (projects.find(p => p.id === selectedId) || projects[0]) : {};
+      const containerWidth = selectedPdfOrientation === 'portrait' ? '760px' : '1060px';
+
+      const reportMode = activeReportMode || (viewMode === 'daily' ? 'daily' : 'weekly');
+      if (reportMode === 'daily') {
+        return `
+          <div class="email-container" style="max-width: ${containerWidth}; margin: 0 auto; background: #ffffff; padding: 12px; font-family: Calibri, Arial, 'Microsoft JhengHei', sans-serif; font-size: 12pt; color: #1e293b;">
+            <div style="border-bottom: 3px solid #0f766e; padding-bottom: 8px; margin-bottom: 12px;">
+              <h2 style="font-size: 16pt; font-weight: bold; color: #0f766e; margin: 0;">Daily Report (${currentTeam})</h2>
+              <div style="font-size: 11pt; color: #64748b; margin-top: 4px;">報告日期: ${dailyReportDate}</div>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; font-size: 12pt;">
+              <thead>
+                <tr style="background-color: #0f766e; color: #ffffff;">
+                  <th style="border: 1px solid #94a3b8; padding: 6px 8px; width: 45px; text-align: center;">No.</th>
+                  <th style="border: 1px solid #94a3b8; padding: 6px 10px; width: 140px;">專案</th>
+                  <th style="border: 1px solid #94a3b8; padding: 6px 10px;">重點方針與行動 (Highlights / Actions)</th>
+                  <th style="border: 1px solid #94a3b8; padding: 6px 8px; width: 90px; text-align: center;">風險等級</th>
+                  <th style="border: 1px solid #94a3b8; padding: 6px 8px; width: 95px; text-align: center;">查核點</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(dailyReports || []).map((item, idx) => `
+                  <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; page-break-inside: avoid; break-inside: avoid;">
+                    <td style="border: 1px solid #94a3b8; padding: 8px 6px; text-align: center; font-weight: bold; vertical-align: top;">${item.no}</td>
+                    <td style="border: 1px solid #94a3b8; padding: 8px 10px; font-weight: bold; color: #0f766e; vertical-align: top;">${item.project}</td>
+                    <td style="border: 1px solid #94a3b8; padding: 8px 10px; line-height: 1.5; vertical-align: top;">
+                      <div style="margin: 0;">
+                        ${(item.actions || []).map(act => `<div style="margin-bottom: 6px;">• ${cleanHtmlString(act)}</div>`).join('')}
+                      </div>
+                    </td>
+                    <td style="border: 1px solid #94a3b8; padding: 8px 6px; text-align: center; vertical-align: top; font-weight: bold;">${item.risk || 'Normal'}</td>
+                    <td style="border: 1px solid #94a3b8; padding: 8px 6px; text-align: center; vertical-align: top;">${item.checkpoint || 'Daily Check'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } else {
+        return `
+          <div class="email-container" style="max-width: ${containerWidth}; margin: 0 auto; background: #ffffff; padding: 12px; font-family: Calibri, Arial, 'Microsoft JhengHei', sans-serif; font-size: 12pt; color: #1e293b;">
+            <!-- 第一頁區塊 -->
+            <div class="avoid-break" style="page-break-inside: avoid; break-inside: avoid; margin-bottom: 16px;">
+              <div style="border-bottom: 3px solid #0f766e; padding-bottom: 8px; margin-bottom: 12px;">
+                <h2 style="font-size: 16pt; font-weight: bold; color: #0f766e; margin: 0;">Weekly Report: ${curProj.project || '專案'} (${curProj.fixture || '治具名稱'})</h2>
+                <div style="font-size: 11pt; color: #64748b; margin-top: 4px;">報告日期: ${weeklyReportDate} • 組別: ${currentTeam} • 階段: ${curProj.phase || '-'}</div>
+              </div>
+
+              <!-- 基本資訊直向排版 -->
+              <table style="width: 100%; border-collapse: collapse; font-size: 12pt; margin-bottom: 12px;">
+                <tr>
+                  <td style="width: 25%; background-color: #f1f5f9; font-weight: bold; border: 1px solid #94a3b8; padding: 6px 8px;">客戶 / CM工廠</td>
+                  <td style="width: 75%; border: 1px solid #94a3b8; padding: 6px 8px;">${curProj.customer || '-'} / ${curProj.cm || '-'}</td>
+                </tr>
+                <tr>
+                  <td style="background-color: #f1f5f9; font-weight: bold; border: 1px solid #94a3b8; padding: 6px 8px;">PM / ME / RD</td>
+                  <td style="border: 1px solid #94a3b8; padding: 6px 8px;">PM: ${curProj.pm || '-'} | ME: ${curProj.me || '-'} | RD: ${curProj.tpe_rd || '-'}</td>
+                </tr>
+                <tr>
+                  <td style="background-color: #f1f5f9; font-weight: bold; border: 1px solid #94a3b8; padding: 6px 8px;">目前狀態 / 交期</td>
+                  <td style="border: 1px solid #94a3b8; padding: 6px 8px; font-weight: bold; color: #0f766e;">狀態: ${curProj.status || '-'} | 交期: ${curProj.deadline || '-'}</td>
+                </tr>
+              </table>
+
+              <!-- 甘特圖（全涵蓋所有進度重點） -->
+              ${generateGanttChartHTML(curProj)}
+            </div>
+
+            <!-- 第二頁獨立區塊 (自動換頁不腰斬) -->
+            <div class="avoid-break" style="page-break-before: always; break-before: page; page-break-inside: avoid; break-inside: avoid; margin-top: 16px;">
+              <!-- 需求矩陣 -->
+              <div style="font-size: 12pt; font-weight: bold; color: #0f766e; margin-bottom: 6px;">📋 Demand & PO/PR 查核矩陣</div>
+              <table style="width: 100%; border-collapse: collapse; font-size: 11pt; margin-bottom: 12px;">
+                <thead>
+                  <tr style="background-color: #f1f5f9; color: #1e293b;">
+                    <th style="border: 1px solid #94a3b8; padding: 5px 6px; text-align: left;">需求項目</th>
+                    <th style="border: 1px solid #94a3b8; padding: 5px 4px; width: 45px; text-align: center;">數量</th>
+                    <th style="border: 1px solid #94a3b8; padding: 5px 6px; width: 85px;">廠區</th>
+                    <th style="border: 1px solid #94a3b8; padding: 5px 6px; width: 75px; text-align: center;">ETD</th>
+                    <th style="border: 1px solid #94a3b8; padding: 5px 4px; width: 45px; text-align: center;">DFM</th>
+                    <th style="border: 1px solid #94a3b8; padding: 5px 4px; width: 45px; text-align: center;">PO</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${(curProj.demands || []).map(d => `
+                    <tr>
+                      <td style="border: 1px solid #94a3b8; padding: 5px 6px; font-weight: bold;">${d.demand || '-'}</td>
+                      <td style="border: 1px solid #94a3b8; padding: 5px 4px; text-align: center;">${d.qty || '-'}</td>
+                      <td style="border: 1px solid #94a3b8; padding: 5px 6px;">${d.site || '-'}</td>
+                      <td style="border: 1px solid #94a3b8; padding: 5px 6px; text-align: center;">${d.etd || '-'}</td>
+                      <td style="border: 1px solid #94a3b8; padding: 5px 4px; text-align: center; font-weight: bold; color: #047857;">${d.dfm ? '✓' : '-'}</td>
+                      <td style="border: 1px solid #94a3b8; padding: 5px 4px; text-align: center;">${d.pr_po ? '✓' : '-'}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+
+              <!-- 歷程週記 -->
+              <div style="font-size: 12pt; font-weight: bold; color: #0f766e; margin: 14px 0 6px 0;">📝 Project Progress (歷程週記)</div>
+              ${(curProj.progress_logs || []).map(l => `
+                <div class="log-card" style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; background: #f8fafc; page-break-inside: avoid; break-inside: avoid;">
+                  <div style="font-weight: bold; color: #0f766e; margin-bottom: 4px; font-size: 11pt;">-[${l.week}]</div>
+                  <div style="font-size: 12pt; line-height: 1.5;">${cleanHtmlString(l.content) || '無日誌紀錄'}</div>
+                </div>
+              `).join('')}
+
+              <!-- 待辦事項 -->
+              <table style="width: 100%; border-collapse: collapse; font-size: 12pt; margin-top: 10px; page-break-inside: avoid; break-inside: avoid;">
+                <tr>
+                  <td style="width: 50%; vertical-align: top; border: 1px solid #fde68a; background-color: #fefce8; padding: 8px;">
+                    <div style="font-weight: bold; color: #854d0e; margin-bottom: 4px;">⚠️ Special Issue / Call Help</div>
+                    <div style="font-size: 12pt; line-height: 1.4;">${cleanHtmlString(curProj.special_issue) || '- 目前無重大卡點 (N/A)'}</div>
+                  </td>
+                  <td style="width: 10px;"></td>
+                  <td style="width: 50%; vertical-align: top; border: 1px solid #99f6e4; background-color: #f0fdfa; padding: 8px;">
+                    <div style="font-weight: bold; color: #115e59; margin-bottom: 4px;">🎯 To-do plan (行動方案)</div>
+                    <div style="font-size: 12pt; line-height: 1.4;">${cleanHtmlString(curProj.todo_plan) || '1. 追蹤後續進度。'}</div>
+                  </td>
+                </tr>
+              </table>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function generateEmailPortraitHTML() {
+      return generateReportHTML(false);
+    }
+
+    function openEmailCopyModal() {
+      const container = document.getElementById('emailModalBody');
+      container.innerHTML = generateEmailPortraitHTML();
+      document.getElementById('emailCopyModal').classList.remove('hidden');
+    }
+
+    function closeEmailCopyModal() {
+      document.getElementById('emailCopyModal').classList.add('hidden');
+    }
+
+    function copyEmailHTMLToClipboard() {
+      const htmlContent = generateEmailPortraitHTML();
+      if (navigator.clipboard && window.ClipboardItem) {
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const textBlob = new Blob([htmlContent.replace(/<[^>]+>/g, '')], { type: 'text/plain' });
+        const item = new ClipboardItem({ 'text/html': blob, 'text/plain': textBlob });
+        navigator.clipboard.write([item]).then(() => {
+          alert('✅ 已成功複製直向 12pt 郵件格式（含甘特圖重點）！請直接在 Outlook 按 Ctrl+V 貼上。');
+          closeEmailCopyModal();
+        }).catch(err => {
+          fallbackCopyText(htmlContent);
+        });
+      } else {
+        fallbackCopyText(htmlContent);
+      }
+    }
+
+    function fallbackCopyText(htmlContent) {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = htmlContent;
+      tempDiv.style.position = 'fixed';
+      tempDiv.style.left = '-9999px';
+      document.body.appendChild(tempDiv);
+      const range = document.createRange();
+      range.selectNode(tempDiv);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+      document.execCommand('copy');
+      document.body.removeChild(tempDiv);
+      alert('✅ 已複製直向表格內容！請直接 in Outlook 按 Ctrl+V 貼上。');
+      closeEmailCopyModal();
+    }
+
+    /* ---------------- Excel 匯出 ---------------- */
+    function downloadTableAsExcel(htmlContent, filename) {
+      const excelTemplate = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
+            th, td { border: 0.5pt solid #cbd5e1; padding: 6px 10px; }
+            th { background-color: #0f766e; color: #ffffff; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          ${htmlContent}
+        </body>
+        </html>
+      `;
+      const blob = new Blob(['\uFEFF' + excelTemplate], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 150);
+    }
+
+    function exportWeeklyReportExcel() {
+      activeReportMode = 'weekly';
+      const reportHtml = generateEmailPortraitHTML();
+      downloadTableAsExcel(reportHtml, `PM_Weekly_Report_${currentTeam || 'Group'}_${weeklyReportDate}.xls`);
+    }
+
+    function exportDailyReportExcel() {
+      activeReportMode = 'daily';
+      const reportHtml = generateEmailPortraitHTML();
+      downloadTableAsExcel(reportHtml, `Daily_Report_${currentTeam || 'Group'}_${dailyReportDate}.xls`);
+    }
+
+    /* ---------------- PDF 匯出（自選方向 + 防裁切） ---------------- */
+    function setPdfOrientation(val) {
+      selectedPdfOrientation = val;
+    }
+
+    /*
+     * 修正左側被裁切：
+     * 1) 舊版設定 html2canvas.windowWidth=1100，但 html2pdf 會把內容放在「置中」的容器裡，
+     *    元素在真實視窗中的 X 座標（例如 400px）與 1100px 截圖視窗中的座標（約 19px）不一致，
+     *    導致截圖整體往右偏移 → 左邊被切掉。現在改用實際視窗寬度，座標一致。
+     * 2) 匯出前先捲回頁面頂端（html2pdf 官方建議），避免捲動位移造成偏移。
+     * 3) 報表寬度改為「剛好等於 PDF 可列印寬度」，不再用 max-width + margin:auto 置中。
+     */
+    function exportReportPDF(filename) {
+      const isPortrait = selectedPdfOrientation === 'portrait';
+      const marginMm = 8;
+      // A4：210 x 297 mm；可列印寬度換算成 px（96 dpi），再保留 4px 安全邊界
+      const pageWidthMm = (isPortrait ? 210 : 297) - marginMm * 2;
+      const contentPx = Math.floor(pageWidthMm * 96 / 25.4) - 4;
+
+      const reportHtml = generateReportHTML(true);
+      const tempContainer = document.createElement('div');
+      tempContainer.style.cssText = `position: fixed; left: -10000px; top: 0; width: ${contentPx}px; background: #ffffff;`;
+      tempContainer.innerHTML = reportHtml;
+      document.body.appendChild(tempContainer);
+
+      const reportEl = tempContainer.firstElementChild;
+      reportEl.style.width = contentPx + 'px';
+      reportEl.style.maxWidth = contentPx + 'px';
+      reportEl.style.margin = '0';
+      reportEl.style.boxSizing = 'border-box';
+      reportEl.style.overflow = 'hidden';
+      reportEl.querySelectorAll('table').forEach(t => { t.style.maxWidth = '100%'; });
+      reportEl.querySelectorAll('td, th').forEach(c => { c.style.overflowWrap = 'anywhere'; });
+      // 甘特圖窄欄位：長英文字放不下時才允許斷字，避免文字超出格子被切掉
+      if (isPortrait) {
+        reportEl.querySelectorAll('td div').forEach(c => { c.style.wordBreak = 'break-all'; });
+      }
+
+      const prevScrollX = window.scrollX, prevScrollY = window.scrollY;
+      window.scrollTo(0, 0);
+
+      const cleanup = () => {
+        if (tempContainer.parentNode) document.body.removeChild(tempContainer);
+        window.scrollTo(prevScrollX, prevScrollY);
+      };
+
+      const opt = {
+        margin: [marginMm, marginMm, marginMm, marginMm],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: document.documentElement.clientWidth
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: selectedPdfOrientation },
+        // 只避免「表格列 / 週記卡片 / 圖片」被切半；不用 avoid-all，避免表頭被單獨留在上一頁、或多出空白頁
+        pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'img', '.avoid-break', '.log-card'] }
+      };
+
+      if (typeof html2pdf === 'undefined') {
+        cleanup();
+        printWithOrientation();
+        return;
+      }
+
+      html2pdf().set(opt).from(reportEl).save()
+        .then(cleanup)
+        .catch(err => {
+          console.error('PDF 匯出失敗，改用列印：', err);
+          cleanup();
+          printWithOrientation();
+        });
+    }
+
+    // 備援：瀏覽器列印時也套用所選的方向
+    function printWithOrientation() {
+      const styleEl = document.createElement('style');
+      styleEl.textContent = `@page { size: A4 ${selectedPdfOrientation}; margin: 8mm; }`;
+      document.head.appendChild(styleEl);
+      window.print();
+      setTimeout(() => styleEl.remove(), 1000);
+    }
+
+    function downloadWeeklyReportPDF() {
+      try {
+        activeReportMode = 'weekly';
+        exportReportPDF(`PM_Weekly_Report_${currentTeam || 'Group'}_${weeklyReportDate}.pdf`);
+      } catch (e) {
+        console.error(e);
+        printWithOrientation();
+      }
+    }
+
+    function downloadDailyReportPDF() {
+      try {
+        activeReportMode = 'daily';
+        exportReportPDF(`Daily_Report_${currentTeam || 'Group'}_${dailyReportDate}.pdf`);
+      } catch (e) {
+        console.error(e);
+        printWithOrientation();
+      }
+    }
+
+    function commitField(projId, field, val) {
+      projects = projects.map(p => p.id === projId ? { ...p, [field]: cleanHtmlString(val) } : p);
+      saveState();
+    }
+
+    function commitLogHTML(projId, logId, htmlVal) {
+      projects = projects.map(p => {
+        if (p.id !== projId) return p;
+        return {
+          ...p,
+          progress_logs: (p.progress_logs || []).map(l => l.id === logId ? { ...l, content: cleanHtmlString(htmlVal) } : l)
+        };
+      });
+      saveState();
+    }
+
+    function appendImageToLog(projId, logId, base64) {
+      const proj = projects.find(p => p.id === projId);
+      if (!proj) return;
+      const log = (proj.progress_logs || []).find(l => l.id === logId);
+      if (!log) return;
+      const curContent = log.content || '';
+      const imgTag = `<br><img src="${base64}" alt="attachment" style="max-width:100% !important; width:auto !important; height:auto !important; max-height:220px !important; object-fit:contain !important; border-radius:6px; margin:4px 0; border:1px solid #cbd5e1;" />`;
+      commitLogHTML(projId, logId, curContent + imgTag);
+      renderApp();
+    }
+
+    function commitFixtureTitle(projId, rawTitle) {
+      const fixtureName = rawTitle.replace(/^NPI Project \(凸?/, '').replace(/\) - .*$/, '');
+      commitField(projId, 'fixture', fixtureName);
+    }
+
+    function commitDemand(projId, demandId, field, val) {
+      projects = projects.map(p => {
+        if (p.id !== projId) return p;
+        return { ...p, demands: (p.demands || []).map(d => d.id === demandId ? { ...d, [field]: val } : d) };
+      });
+      saveState();
+      renderApp();
+    }
+
+    function deleteDemand(projId, demandId) {
+      projects = projects.map(p => p.id === projId ? { ...p, demands: (p.demands || []).filter(d => d.id !== demandId) } : p);
+      saveState();
+      renderApp();
+    }
+
+    function addLog(projId) {
+      projects = projects.map(p => {
+        if (p.id !== projId) return p;
+        const list = p.progress_logs || [];
+        const nextNum = list.length > 0 ? (parseInt(list[0].week.replace(/[^0-9]/g, '') || '44', 10) + 1) : 45;
+        const newL = { id: 'log_' + Date.now(), week: `WK${nextNum}`, content: '<div>1. 進度事項...</div>' };
+        return { ...p, progress_logs: [newL, ...list] };
+      });
+      renderApp();
+    }
+
+    function deleteLog(projId, logId) {
+      projects = projects.map(p => p.id === projId ? { ...p, progress_logs: (p.progress_logs || []).filter(l => l.id !== logId) } : p);
+      renderApp();
+    }
+
+    function addNewProject() {
+      const p = {
+        id: 'proj_' + Date.now(),
+        project: `PRJ-0${projects.length + 1}`,
+        location: 'TP',
+        cm: 'Wistron湖口',
+        phase: 'P1',
+        fixture: `測試模組治具 #${projects.length + 1}`,
+        status: '設計',
+        deadline: '11/10',
+        pm: 'Jane',
+        tpe_rd: 'Eliot',
+        tt_ee: 'X',
+        me: 'Mark',
+        sw: 'X',
+        fae: 'X',
+        milestones: {},
+        customer: 'Lenovo / Wistron湖口',
+        contact_customer: 'DRI',
+        competitor: 'NA',
+        tt_resources: 'AM: Jasmine, PM: Jane, RD: Eliot, ME: Mark',
+        demands: [],
+        schedule_desc: '',
+        progress_logs: [],
+        special_issue: '- 目前無重大卡點 (N/A)',
+        todo_plan: ''
+      };
+      projects.push(p);
+      selectedId = p.id;
+      renderApp();
+    }
+
+    function duplicateProject(id) {
+      const target = projects.find(p => p.id === id);
+      if (!target) return;
+      const copy = JSON.parse(JSON.stringify(target));
+      copy.id = 'proj_' + Date.now();
+      copy.fixture = (copy.fixture || '專案') + ' (副本)';
+      projects.push(copy);
+      selectedId = copy.id;
+      renderApp();
+    }
+
+    function deleteProject(id) {
+      projects = projects.filter(p => p.id !== id);
+      if (projects.length === 0) projects = (currentTeam === 'Jane') ? JSON.parse(JSON.stringify(JANE_INITIAL_PROJECTS)) : createBlankProject();
+      selectedId = projects[0].id;
+      renderApp();
+    }
+
+    function resetToInitialData() {
+      if (confirm(`確定要將 [組別: ${currentTeam}] 的週報資料還原回預設嗎？`)) {
+        try {
+          localStorage.removeItem(`PM_SYSTEM_ACTIVE_PROJECTS_${currentTeam}`);
+          localStorage.removeItem(`PM_SYSTEM_ACTIVE_WEEKS_${currentTeam}`);
+        } catch (e) {}
+        weeks = DEFAULT_WEEKS;
+        projects = (currentTeam === 'Jane') ? JSON.parse(JSON.stringify(JANE_INITIAL_PROJECTS)) : createBlankProject();
+        selectedId = projects[0].id;
+        renderApp();
+      }
+    }
+
+    function addNewWeek() {
+      const lastWeek = weeks[weeks.length - 1];
+      let nextWkNum = 1, nextDate = '1/5', nextMonth = 'Jan-27';
+      if (lastWeek) {
+        const m = lastWeek.week.match(/\d+/);
+        if (m) nextWkNum = parseInt(m[0], 10) + 1;
+        if (lastWeek.date && lastWeek.date.includes('/')) {
+          const [mo, da] = lastWeek.date.split('/').map(n => parseInt(n, 10));
+          const d = new Date(2026, mo - 1, da);
+          d.setDate(d.getDate() + 7);
+          nextDate = `${d.getMonth() + 1}/${d.getDate()}`;
+          const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+          nextMonth = `${monthNames[d.getMonth()]}-${String(d.getFullYear()).slice(-2)}`;
+        }
+      }
+      weeks.push({ id: 'w_' + Date.now(), week: `WK${nextWkNum}`, month: nextMonth, date: nextDate });
+      renderApp();
+    }
+
+    function deleteWeek(id) {
+      if (weeks.length <= 1) return;
+      weeks = weeks.filter(w => w.id !== id);
+      renderApp();
+    }
+
+    function liveColorBadge(inputEl) {
+      if (inputEl.style.backgroundColor && inputEl.style.backgroundColor !== '') return;
+      const val = inputEl.value;
+      inputEl.className = "w-full text-center text-[10px] leading-tight py-1 pr-3 focus:bg-white rounded font-medium";
+      if (val.includes('DFM') || val.includes('需求')) inputEl.classList.add('bg-blue-100', 'text-blue-800', 'font-bold');
+      else if (val.includes('KO') || val.includes('BOM')) inputEl.classList.add('bg-purple-100', 'text-purple-800', 'font-bold');
+      else if (val.includes('採購') || val.includes('備料')) inputEl.classList.add('bg-amber-100', 'text-amber-800', 'font-bold');
+      else if (val.includes('組裝') || val.includes('調適')) inputEl.classList.add('bg-orange-100', 'text-orange-800', 'font-bold');
+      else inputEl.classList.add('bg-transparent', 'text-slate-700');
+    }
+
+    function handleCellKey(e, inputEl) {
+      if (e.key === 'Enter') inputEl.blur();
+    }
+
+    function commitMilestone(projId, weekId, val) {
+      projects = projects.map(p => {
+        if (p.id !== projId) return p;
+        const cur = (p.milestones && p.milestones[weekId]) || '';
+        if (typeof cur === 'object') {
+          return { ...p, milestones: { ...(p.milestones || {}), [weekId]: { ...cur, text: val } } };
+        } else {
+          return { ...p, milestones: { ...(p.milestones || {}), [weekId]: val } };
+        }
+      });
+      saveState();
+    }
+
+    /* =====================================================================
+     * 主畫面渲染 renderApp()（重建版）
+     * 使用本檔既有的資料結構與函式：projects / weeks / dailyReports、
+     * commitField、commitMilestone、commitLogHTML、openColorPalette 等。
+     * ===================================================================== */
+    let activeReportMode = '';   // 'weekly' | 'daily'：匯出 / 複製時指定報表種類
+
+    function esc(v) {
+      return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function jsq(v) {
+      return esc(String(v == null ? '' : v).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+    }
+
+    function getKnownTeams() {
+      const teams = new Set();
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i) || '';
+          if (k.startsWith('PM_SYSTEM_ACTIVE_PROJECTS_')) teams.add(k.replace('PM_SYSTEM_ACTIVE_PROJECTS_', ''));
+        }
+      } catch (e) {}
+      if (currentTeam) teams.add(currentTeam);
+      return [...teams].filter(Boolean).sort();
+    }
+
+    // 網址沒有 ?team= 時，自動以登入姓名作為組別
+    function ensureTeam() {
+      if (currentTeam) return;
+      const u = getLoggedInUser().replace(/[^a-zA-Z0-9_\-一-龥]/g, '').trim();
+      if (!u) return;
+      currentTeam = u;
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('team', u);
+        history.replaceState(null, '', url.toString());
+      } catch (e) {}
+      initDataForCurrentTeam();
+    }
+
+    /* ---------- 補充的小型資料操作 ---------- */
+    function commitDemandQuiet(projId, demandId, field, val) {
+      projects = projects.map(p => {
+        if (p.id !== projId) return p;
+        return { ...p, demands: (p.demands || []).map(d => d.id === demandId ? { ...d, [field]: val } : d) };
+      });
+      saveState();
+    }
+
+    function addDemand(projId) {
+      projects = projects.map(p => {
+        if (p.id !== projId) return p;
+        const d = { id: 'd_' + Date.now(), demand: '新需求項目', qty: '1', site: '', etd: '', eta: '', dfm: false, quote: false, pr_po: false, ko: false, bom: false, sw_key: false };
+        return { ...p, demands: [...(p.demands || []), d] };
+      });
+      renderApp();
+    }
+
+    function commitLogWeek(projId, logId, val) {
+      projects = projects.map(p => {
+        if (p.id !== projId) return p;
+        return { ...p, progress_logs: (p.progress_logs || []).map(l => l.id === logId ? { ...l, week: val.trim() } : l) };
+      });
+      saveState();
+    }
+
+    function commitWeek(weekId, field, val) {
+      weeks = weeks.map(w => w.id === weekId ? { ...w, [field]: val.trim() } : w);
+      saveState();
+      renderApp();
+    }
+
+    function confirmDeleteProject(id) {
+      const p = projects.find(x => x.id === id);
+      if (confirm(`確定要刪除專案「${(p && (p.project || p.fixture)) || ''}」嗎？`)) deleteProject(id);
+    }
+
+    function confirmDeleteWeek(id) {
+      const w = weeks.find(x => x.id === id);
+      if (confirm(`確定要刪除 ${w ? w.week : ''} 這一週欄位嗎？（該週的里程碑文字會一併隱藏）`)) deleteWeek(id);
+    }
+
+    function runReport(mode, fn) {
+      saveActiveEditorContent();
+      activeReportMode = mode;
+      fn();
+    }
+
+    /* ---------- 備份匯出 / 匯入 ---------- */
+    function exportBackup() {
+      saveActiveEditorContent();
+      const data = {
+        version: '2026.11',
+        team: currentTeam,
+        exportDate: new Date().toISOString(),
+        weeklyReportDate,
+        dailyReportDate,
+        projects,
+        weeks,
+        dailyReports
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const today = new Date();
+      const ds = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      a.href = url;
+      a.download = `PM_Backup_${currentTeam || 'Group'}_${ds}.json`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 150);
+    }
+
+    function triggerBackupImport() {
+      const input = document.getElementById('backupImporter');
+      input.value = '';
+      input.click();
+    }
+
+    function importBackupFile(e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (evt) {
+        let data;
+        try { data = JSON.parse(evt.target.result); } catch (err) {
+          alert('❌ 無法讀取備份檔：檔案不是有效的 JSON。');
+          return;
+        }
+        if (!data || !Array.isArray(data.projects)) {
+          alert('❌ 這個檔案不是本系統的備份檔（找不到 projects 資料）。');
+          return;
+        }
+        const target = currentTeam || data.team || '';
+        if (!confirm(`將以備份檔（組別: ${data.team || '未標示'}，匯出時間: ${data.exportDate || '-'}）覆蓋目前 [組別: ${target}] 的所有資料，確定嗎？`)) return;
+        if (!currentTeam && data.team) {
+          currentTeam = String(data.team).replace(/[^a-zA-Z0-9_\-一-龥]/g, '');
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.set('team', currentTeam);
+            history.replaceState(null, '', url.toString());
+          } catch (err) {}
+        }
+        projects = data.projects;
+        if (Array.isArray(data.weeks) && data.weeks.length) weeks = data.weeks;
+        if (Array.isArray(data.dailyReports)) dailyReports = data.dailyReports;
+        if (data.weeklyReportDate) weeklyReportDate = data.weeklyReportDate;
+        if (data.dailyReportDate) dailyReportDate = data.dailyReportDate;
+        selectedId = projects[0] ? projects[0].id : '';
+        saveState();
+        renderApp();
+        alert('✅ 備份已匯入完成！');
+      };
+      reader.readAsText(file, 'utf-8');
+    }
+
+    /* ---------- 共用小元件 ---------- */
+    const BTN = 'inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition whitespace-nowrap';
+    const BTN_PRIMARY = `${BTN} bg-teal-700 text-white hover:bg-teal-800 shadow-sm`;
+    const BTN_GHOST = `${BTN} bg-white text-slate-700 border border-slate-300 hover:bg-slate-50`;
+    const BTN_DANGER = `${BTN} bg-white text-rose-600 border border-rose-200 hover:bg-rose-50`;
+    const INPUT = 'w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600';
+    const CARD = 'bg-white rounded-2xl border border-slate-200 shadow-sm';
+
+    function reportToolbar(mode) {
+      const isW = mode === 'weekly';
+      const pdfFn = isW ? 'downloadWeeklyReportPDF' : 'downloadDailyReportPDF';
+      const xlsFn = isW ? 'exportWeeklyReportExcel' : 'exportDailyReportExcel';
+      return `
+        <div class="flex flex-wrap items-center gap-2 no-print">
+          <button type="button" class="${BTN_PRIMARY}" onclick="runReport('${mode}', ${pdfFn})">📄 匯出 PDF</button>
+          <button type="button" class="${BTN_GHOST}" onclick="runReport('${mode}', ${xlsFn})">📊 匯出 Excel</button>
+          <button type="button" class="${BTN_GHOST}" onclick="runReport('${mode}', openEmailCopyModal)">✉️ 郵件格式複製</button>
+          <button type="button" class="${BTN_DANGER}" onclick="${isW ? 'resetToInitialData()' : 'resetDailyReport()'}">↺ 還原預設</button>
+        </div>`;
+    }
+
+    function richEditor(content, onSaveJs, placeholder, extraCls = '') {
+      return `<div class="rich-editor ${extraCls} rounded-md border border-slate-200 bg-white px-2.5 py-2 text-sm leading-relaxed focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
+          contenteditable="true" placeholder="${esc(placeholder)}"
+          onblur="${onSaveJs.replace(/__VAL__/g, 'this.innerHTML')}"
+          onpaste="handleRichPaste(event, () => { ${onSaveJs.replace(/__VAL__/g, 'this.innerHTML')} })">${content || ''}</div>`;
+    }
+
+    /* ---------- 頁首 ---------- */
+    function renderHeader() {
+      const teams = getKnownTeams();
+      const user = getLoggedInUser();
+      const tab = (m, label) => `<button type="button" onclick="setViewMode('${m}')" class="px-3 py-1.5 rounded-md text-xs font-bold transition ${viewMode === m ? 'bg-white text-teal-800 shadow' : 'text-teal-50 hover:bg-white/10'}">${label}</button>`;
+      return `
+        <header class="no-print rounded-2xl bg-teal-800 text-white shadow-md px-4 py-3 sm:px-5 sm:py-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center font-black">PM</div>
+              <div>
+                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM Weekly Report 專案管理系統</h1>
+                <div class="text-xs text-teal-100">登入者：${esc(user)} • 組別：${esc(currentTeam || '-')}</div>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="flex rounded-lg bg-teal-900/50 p-1">${tab('both', '全部')}${tab('weekly', '週報 Weekly')}${tab('daily', '日報 Daily')}</div>
+              <select class="rounded-lg bg-white text-slate-800 text-xs font-semibold px-2 py-1.5" title="切換組別"
+                onchange="if (this.value === '__new__') { this.value = '${jsq(currentTeam)}'; promptNewTeam(); } else { switchTeam(this.value); }">
+                ${teams.map(t => `<option value="${esc(t)}" ${t === currentTeam ? 'selected' : ''}>組別：${esc(t)}</option>`).join('')}
+                <option value="__new__">＋ 新增組別…</option>
+              </select>
+              <select class="rounded-lg bg-white text-slate-800 text-xs font-semibold px-2 py-1.5" title="PDF 方向" onchange="setPdfOrientation(this.value)">
+                <option value="landscape" ${selectedPdfOrientation === 'landscape' ? 'selected' : ''}>PDF：橫向</option>
+                <option value="portrait" ${selectedPdfOrientation === 'portrait' ? 'selected' : ''}>PDF：直向</option>
+              </select>
+              <button type="button" class="${BTN} bg-white/15 hover:bg-white/25 text-white" onclick="exportBackup()">💾 備份匯出</button>
+              <button type="button" class="${BTN} bg-white/15 hover:bg-white/25 text-white" onclick="triggerBackupImport()">📂 備份匯入</button>
+              <button type="button" class="${BTN} bg-white/15 hover:bg-white/25 text-white" onclick="handleLogout()">登出</button>
+            </div>
+          </div>
+        </header>`;
+    }
+
+    /* ---------- 週報：全專案時程表 ---------- */
+    function renderMilestoneTable() {
+      const groups = getMonthGroups();
+      const BASE = 'w-full text-center text-[10px] leading-tight py-1 pr-3 rounded';
+      const rows = projects.map(p => {
+        const cells = weeks.map(w => {
+          const m = (p.milestones && p.milestones[w.id]) || '';
+          const text = typeof m === 'object' ? (m.text || '') : m;
+          const custom = typeof m === 'object' && m.bg;
+          const cls = custom ? `${BASE} font-bold` : `${BASE} focus:bg-white font-medium`;
+          const style = custom ? `background-color:${esc(m.bg)};color:${esc(m.color || '#0f172a')};` : '';
+          return `
+            <td class="border border-slate-200 p-0.5 align-middle min-w-[92px]">
+              <div class="relative">
+                <input data-ms="1" class="${cls}" style="${style}" value="${esc(text)}" title="${esc(text)}"
+                  oninput="liveColorBadge(this)" onkeydown="handleCellKey(event, this)"
+                  onchange="commitMilestone('${jsq(p.id)}', '${jsq(w.id)}', this.value)" />
+                <button type="button" tabindex="-1" title="設定顏色" onclick="openColorPalette('${jsq(p.id)}', '${jsq(w.id)}', this)"
+                  class="absolute right-0 top-0 h-full px-0.5 text-[9px] opacity-40 hover:opacity-100">🎨</button>
+              </div>
+            </td>`;
+        }).join('');
+        const isSel = p.id === selectedId;
+        return `
+          <tr class="${isSel ? 'bg-teal-50/60' : ''}">
+            <td class="sticky-col-1 border border-slate-200 px-2 py-1 align-middle min-w-[150px] ${isSel ? 'bg-teal-50' : 'bg-slate-50'}">
+              <button type="button" onclick="selectProject('${jsq(p.id)}')" class="text-left w-full">
+                <div class="text-xs font-bold ${isSel ? 'text-teal-800' : 'text-slate-800'}">${esc(p.project || '-')}</div>
+                <div class="text-[10px] text-slate-500 truncate max-w-[160px]">${esc(p.fixture || '')}</div>
+              </button>
+            </td>
+            ${cells}
+          </tr>`;
+      }).join('');
+
+      return `
+        <div class="overflow-x-auto touch-scroll rounded-xl border border-slate-200">
+          <table class="border-collapse text-xs w-full">
+            <thead>
+              <tr class="bg-slate-200 text-slate-700">
+                <th rowspan="2" class="sticky-col-header border border-slate-300 px-2 py-1 text-left">專案 / 治具</th>
+                ${groups.map(g => `<th colspan="${g.span}" class="border border-slate-300 px-1 py-1 text-center font-bold">${esc(g.month)}</th>`).join('')}
+              </tr>
+              <tr class="bg-slate-100 text-slate-700">
+                ${weeks.map(w => `
+                  <th class="border border-slate-300 px-1 py-1 font-semibold group">
+                    <div class="flex items-center justify-center gap-0.5">
+                      <input class="w-12 bg-transparent text-center font-bold text-[11px] focus:bg-white rounded" value="${esc(w.week)}" onchange="commitWeek('${jsq(w.id)}', 'week', this.value)" />
+                      <button type="button" class="text-slate-400 hover:text-rose-600 text-[10px] opacity-0 group-hover:opacity-100" title="刪除此週" onclick="confirmDeleteWeek('${jsq(w.id)}')">✕</button>
+                    </div>
+                    <input class="w-12 bg-transparent text-center text-[10px] text-slate-500 font-normal focus:bg-white rounded" value="${esc(w.date)}" onchange="commitWeek('${jsq(w.id)}', 'date', this.value)" />
+                  </th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    }
+
+    /* ---------- 週報：單一專案明細 ---------- */
+    const PROJECT_FIELDS = [
+      ['project', '專案代號'], ['fixture', '治具名稱'], ['customer', '客戶'], ['cm', 'CM 工廠'],
+      ['location', '地點'], ['phase', '階段'], ['status', '目前狀態'], ['deadline', '交期'],
+      ['pm', 'PM'], ['me', 'ME'], ['tpe_rd', 'RD'], ['tt_ee', 'EE'],
+      ['sw', 'SW'], ['fae', 'FAE'], ['contact_customer', '客戶窗口'], ['competitor', '競爭對手']
+    ];
+    const RERENDER_FIELDS = ['project', 'fixture', 'phase', 'status', 'deadline', 'customer', 'cm', 'pm', 'me', 'tpe_rd'];
+
+    function renderProjectDetail(p) {
+      if (!p) return '';
+      const pid = jsq(p.id);
+      const field = ([key, label]) => `
+        <label class="block">
+          <span class="block text-[11px] font-bold text-slate-500 mb-0.5">${label}</span>
+          <input class="${INPUT}" value="${esc(p[key])}" onchange="commitField('${pid}', '${key}', this.value)${RERENDER_FIELDS.includes(key) ? '; renderApp()' : ''}" />
+        </label>`;
+
+      const checks = [['dfm', 'DFM'], ['quote', '報價'], ['pr_po', 'PR/PO'], ['ko', 'KO'], ['bom', 'BOM'], ['sw_key', 'SW Key']];
+      const demandRows = (p.demands || []).map(d => {
+        const did = jsq(d.id);
+        const txt = (k, w) => `<td class="border border-slate-200 p-1 ${w}"><input class="w-full rounded px-1.5 py-1 text-sm focus:bg-teal-50 focus:outline-none" value="${esc(d[k])}" onchange="commitDemandQuiet('${pid}', '${did}', '${k}', this.value)" /></td>`;
+        return `
+          <tr>
+            ${txt('demand', 'min-w-[220px]')}${txt('qty', 'w-16')}${txt('site', 'min-w-[110px]')}${txt('etd', 'w-20')}${txt('eta', 'w-20')}
+            ${checks.map(([k]) => `<td class="border border-slate-200 p-1 text-center w-14"><input type="checkbox" class="w-4 h-4 accent-teal-700" ${d[k] ? 'checked' : ''} onchange="commitDemand('${pid}', '${did}', '${k}', this.checked)" /></td>`).join('')}
+            <td class="border border-slate-200 p-1 text-center w-10"><button type="button" class="text-slate-400 hover:text-rose-600" title="刪除" onclick="if (confirm('確定刪除這筆需求？')) deleteDemand('${pid}', '${did}')">✕</button></td>
+          </tr>`;
+      }).join('');
+
+      const logs = (p.progress_logs || []).map(l => {
+        const lid = jsq(l.id);
+        return `
+          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <input class="w-24 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm font-bold text-teal-800" value="${esc(l.week)}" onchange="commitLogWeek('${pid}', '${lid}', this.value)" />
+              <div class="flex items-center gap-1.5">
+                <button type="button" class="${BTN_GHOST}" onclick="triggerImageUpload(b64 => appendImageToLog('${pid}', '${lid}', b64))">🖼️ 插入圖片</button>
+                <button type="button" class="${BTN_DANGER}" onclick="if (confirm('確定刪除 ${jsq(l.week)} 的週記？')) deleteLog('${pid}', '${lid}')">刪除</button>
+              </div>
+            </div>
+            ${richEditor(l.content, `commitLogHTML('${pid}', '${lid}', __VAL__)`, '輸入本週進度…（可直接貼上表格或截圖）')}
+          </div>`;
+      }).join('');
+
+      return `
+        <section class="${CARD} p-4 sm:p-5 space-y-5">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div class="text-[11px] font-bold uppercase tracking-wide text-teal-700">專案明細</div>
+              <h3 class="text-lg font-bold text-slate-800">${esc(p.project || '-')} <span class="text-slate-500 font-semibold">(${esc(p.fixture || '')})</span></h3>
+            </div>
+            <div class="flex flex-wrap gap-2 no-print">
+              <button type="button" class="${BTN_GHOST}" onclick="duplicateProject('${pid}')">⧉ 複製專案</button>
+              <button type="button" class="${BTN_DANGER}" onclick="confirmDeleteProject('${pid}')">🗑 刪除專案</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">${PROJECT_FIELDS.map(field).join('')}</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label class="block"><span class="block text-[11px] font-bold text-slate-500 mb-0.5">資源配置 (TT Resources)</span>
+              <input class="${INPUT}" value="${esc(p.tt_resources)}" onchange="commitField('${pid}', 'tt_resources', this.value)" /></label>
+            <label class="block"><span class="block text-[11px] font-bold text-slate-500 mb-0.5">時程說明</span>
+              <input class="${INPUT}" value="${esc(p.schedule_desc)}" onchange="commitField('${pid}', 'schedule_desc', this.value)" /></label>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="text-sm font-bold text-teal-800">📋 Demand & PO/PR 查核矩陣</h4>
+              <button type="button" class="${BTN_GHOST} no-print" onclick="addDemand('${pid}')">＋ 新增需求</button>
+            </div>
+            <div class="overflow-x-auto touch-scroll rounded-xl border border-slate-200">
+              <table class="w-full border-collapse text-sm">
+                <thead class="bg-slate-100 text-slate-700 text-xs">
+                  <tr>
+                    <th class="border border-slate-200 px-2 py-1.5 text-left">需求項目</th><th class="border border-slate-200 px-2 py-1.5">數量</th>
+                    <th class="border border-slate-200 px-2 py-1.5">廠區</th><th class="border border-slate-200 px-2 py-1.5">ETD</th><th class="border border-slate-200 px-2 py-1.5">ETA</th>
+                    ${checks.map(([, label]) => `<th class="border border-slate-200 px-1 py-1.5">${label}</th>`).join('')}
+                    <th class="border border-slate-200 px-1 py-1.5"></th>
+                  </tr>
+                </thead>
+                <tbody>${demandRows || `<tr><td colspan="12" class="text-center text-slate-400 text-xs py-4">尚無需求項目，按「新增需求」開始填寫。</td></tr>`}</tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="text-sm font-bold text-teal-800">📝 Project Progress（歷程週記）</h4>
+              <button type="button" class="${BTN_GHOST} no-print" onclick="addLog('${pid}')">＋ 新增週記</button>
+            </div>
+            <div class="space-y-3">${logs || '<div class="text-center text-slate-400 text-xs py-4">尚無週記。</div>'}</div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <div class="text-sm font-bold text-amber-800 mb-2">⚠️ Special Issue / Call Help</div>
+              ${richEditor(p.special_issue, `commitField('${pid}', 'special_issue', __VAL__)`, '- 目前無重大卡點 (N/A)')}
+            </div>
+            <div class="rounded-xl border border-teal-200 bg-teal-50 p-3">
+              <div class="text-sm font-bold text-teal-800 mb-2">🎯 To-do plan（行動方案）</div>
+              ${richEditor(p.todo_plan, `commitField('${pid}', 'todo_plan', __VAL__)`, '1. 追蹤後續進度。')}
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-bold text-teal-800 mb-1">報表甘特圖預覽</h4>
+            <div class="overflow-x-auto touch-scroll">${generateGanttChartHTML(p)}</div>
+          </div>
+        </section>`;
+    }
+
+    function renderWeeklySection() {
+      const cur = projects.find(p => p.id === selectedId) || projects[0];
+      return `
+        <section class="${CARD} p-4 sm:p-5 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-3">
+              <h2 class="text-base sm:text-lg font-bold text-slate-800">📅 Weekly Report 週報</h2>
+              <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-600">報告日期
+                <input type="date" class="rounded-md border border-slate-300 px-2 py-1 text-sm" value="${esc(weeklyReportDate)}" onchange="updateWeeklyDate(this.value)" />
+              </label>
+            </div>
+            ${reportToolbar('weekly')}
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 no-print">
+            ${projects.map(p => `
+              <button type="button" onclick="selectProject('${jsq(p.id)}')"
+                class="rounded-full px-3 py-1.5 text-xs font-bold border transition ${p.id === selectedId ? 'bg-teal-700 text-white border-teal-700' : 'bg-white text-slate-700 border-slate-300 hover:border-teal-600'}">
+                ${esc(p.project || '-')}<span class="font-normal opacity-80"> · ${esc(p.fixture || '')}</span>
+              </button>`).join('')}
+            <button type="button" class="${BTN_GHOST}" onclick="addNewProject()">＋ 新增專案</button>
+            <button type="button" class="${BTN_GHOST}" onclick="addNewWeek()">＋ 新增一週</button>
+          </div>
+
+          ${renderMilestoneTable()}
+          <p class="text-[11px] text-slate-500 no-print">提示：點專案名稱可切換下方明細；格子右側 🎨 可設定底色與字色；週次與日期可直接點擊修改。</p>
+        </section>
+        ${renderProjectDetail(cur)}`;
+    }
+
+    /* ---------- 日報 ---------- */
+    function renderDailySection() {
+      const rows = (dailyReports || []).map((item, i) => {
+        const actions = (item.actions || []).map((act, j) => `
+          <div class="flex items-start gap-1.5">
+            <span class="mt-2 text-teal-700 font-bold">•</span>
+            <div class="flex-1">${richEditor(act, `updateDailyActionHTML(${i}, ${j}, __VAL__)`, '重點事項…')}</div>
+            <div class="flex flex-col gap-1 no-print">
+              <button type="button" class="text-xs text-slate-400 hover:text-teal-700" title="插入圖片" onclick="triggerImageUpload(b64 => appendImageToDailyAction(${i}, ${j}, b64))">🖼️</button>
+              <button type="button" class="text-xs text-slate-400 hover:text-rose-600" title="刪除此項" onclick="deleteDailyAction(${i}, ${j})">✕</button>
+            </div>
+          </div>`).join('');
+        const risk = item.risk || 'Low';
+        const riskCls = risk === 'High' ? 'bg-rose-100 text-rose-800' : risk === 'Medium' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800';
+        return `
+          <tr class="${i % 2 ? 'bg-slate-50' : 'bg-white'} align-top">
+            <td class="border border-slate-200 p-2 text-center font-bold text-slate-700 w-12">${esc(item.no)}</td>
+            <td class="border border-slate-200 p-2 w-40"><input class="${INPUT} font-bold text-teal-800" value="${esc(item.project)}" onchange="updateDailyProject(${i}, 'project', this.value)" /></td>
+            <td class="border border-slate-200 p-2 min-w-[320px]">
+              <div class="space-y-1.5">${actions}</div>
+              <button type="button" class="mt-2 text-xs font-semibold text-teal-700 hover:underline no-print" onclick="addDailyAction(${i})">＋ 新增重點</button>
+            </td>
+            <td class="border border-slate-200 p-2 w-28 text-center">
+              <select class="rounded-md px-2 py-1 text-xs font-bold ${riskCls}" onchange="updateDailyProject(${i}, 'risk', this.value); renderApp()">
+                ${['Low', 'Medium', 'High'].map(r => `<option ${r === risk ? 'selected' : ''}>${r}</option>`).join('')}
+              </select>
+            </td>
+            <td class="border border-slate-200 p-2 w-32"><input class="${INPUT} text-center text-xs" value="${esc(item.checkpoint || 'Daily Check')}" onchange="updateDailyProject(${i}, 'checkpoint', this.value)" /></td>
+            <td class="border border-slate-200 p-2 w-10 text-center no-print"><button type="button" class="text-slate-400 hover:text-rose-600" title="刪除此專案列" onclick="if (confirm('確定刪除這一列？')) deleteDailyProject(${i})">✕</button></td>
+          </tr>`;
+      }).join('');
+
+      return `
+        <section class="${CARD} p-4 sm:p-5 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-3">
+              <h2 class="text-base sm:text-lg font-bold text-slate-800">🗓️ Daily Report 日報</h2>
+              <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-600">報告日期
+                <input type="date" class="rounded-md border border-slate-300 px-2 py-1 text-sm" value="${esc(dailyReportDate)}" onchange="updateDailyDate(this.value)" />
+              </label>
+            </div>
+            ${reportToolbar('daily')}
+          </div>
+          <div class="overflow-x-auto touch-scroll rounded-xl border border-slate-200">
+            <table class="w-full border-collapse text-sm">
+              <thead class="bg-teal-700 text-white text-xs">
+                <tr>
+                  <th class="border border-teal-800 px-2 py-2">No.</th><th class="border border-teal-800 px-2 py-2 text-left">專案</th>
+                  <th class="border border-teal-800 px-2 py-2 text-left">重點方針與行動 (Highlights / Actions)</th>
+                  <th class="border border-teal-800 px-2 py-2">風險等級</th><th class="border border-teal-800 px-2 py-2">查核點</th>
+                  <th class="border border-teal-800 px-2 py-2 no-print"></th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+          <button type="button" class="${BTN_GHOST} no-print" onclick="addDailyProject()">＋ 新增專案列</button>
+        </section>`;
+    }
+
+    /* ---------- 主渲染 ---------- */
+    function renderApp() {
+      const app = document.getElementById('app');
+      if (!app) return;
+      if (!getLoggedInUser()) { checkAuth(); return; }
+      ensureTeam();
+
+      if (!projects || projects.length === 0) {
+        projects = (currentTeam === 'Jane') ? JSON.parse(JSON.stringify(JANE_INITIAL_PROJECTS)) : createBlankProject();
+      }
+      if (!dailyReports || dailyReports.length === 0) dailyReports = createBlankDaily();
+      if (!projects.some(p => p.id === selectedId)) selectedId = projects[0].id;
+      saveState();
+
+      const scrollY = window.scrollY;
+      app.innerHTML = `
+        ${renderHeader()}
+        ${viewMode !== 'daily' ? renderWeeklySection() : ''}
+        ${viewMode !== 'weekly' ? renderDailySection() : ''}
+        <footer class="text-center text-[11px] text-slate-400 py-2 no-print">資料儲存在此瀏覽器中（依組別分開）。換電腦或清除瀏覽器資料前，請先按「備份匯出」。</footer>`;
+
+      app.querySelectorAll('input[data-ms]').forEach(el => liveColorBadge(el));
+      window.scrollTo(0, scrollY);
+    }
+
+    if (checkAuth()) {
+      initDataForCurrentTeam();
+      renderApp();
+    }
+  </script>
+</body>
+</html>
