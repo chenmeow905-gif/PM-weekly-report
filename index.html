@@ -566,10 +566,12 @@
     let embeddedNotice = null;   // { hadOld: bool }
 
     function applyEmbeddedDataIfNewer() {
-      if (currentTeam !== EMBEDDED_TEAM) return;
-      let stamp = '';
-      try { stamp = localStorage.getItem(`PM_SYSTEM_DATA_STAMP_${currentTeam}`) || ''; } catch (e) {}
-      if (stamp && stamp >= EMBEDDED_STAMP) return;   // 瀏覽器裡的資料比內建的新 → 保留
+      if (String(currentTeam).toLowerCase() !== String(EMBEDDED_TEAM).toLowerCase()) return;
+      // 每一版內建內容只會「強制套用一次」：第一次打開這一版時，一律換成內建的最新內容；
+      // 之後在網頁上的修改就會保留，不會再被覆蓋。
+      let applied = '';
+      try { applied = localStorage.getItem(`PM_SYSTEM_EMBED_APPLIED_${currentTeam}`) || ''; } catch (e) {}
+      if (applied === EMBEDDED_STAMP) return;
 
       // 先把瀏覽器裡原本的資料另存一份（可從提示列下載）
       let hadOld = false;
@@ -595,6 +597,7 @@
       dailyReportDate = EMBEDDED_DAILY_DATE;
       embeddedNotice = { hadOld };
       saveState();
+      try { localStorage.setItem(`PM_SYSTEM_EMBED_APPLIED_${currentTeam}`, EMBEDDED_STAMP); } catch (e) {}
     }
 
     function downloadPreviousData() {
@@ -1085,9 +1088,8 @@
       const demands = (proj && proj.demands) || [];
       const TH = 'border: 1px solid #0f766e; background-color: #0f766e; color: #ffffff; font-weight: bold; text-align: center; white-space: nowrap; padding: 5px 3px;';
       const TD = 'border: 1px solid #94a3b8; padding: 5px 4px; vertical-align: middle;';
-      const PENDING = 'background-color: #fef3c7; color: #b45309; font-weight: bold;';
       const textCell = (v, align) => isBlankVal(v)
-        ? `<td style="${TD} ${PENDING} text-align: center;">待填</td>`
+        ? `<td style="${TD}"></td>`
         : `<td style="${TD} text-align: ${align};">${v}</td>`;
 
       const rows = demands.map(d => `
@@ -1099,7 +1101,7 @@
           ${textCell(d.eta, 'center')}
           ${DEMAND_CHECKS.map(([k]) => d[k]
             ? `<td style="${TD} text-align: center; color: #047857; font-weight: bold;">✓</td>`
-            : `<td style="${TD} ${PENDING} text-align: center;">未完成</td>`).join('')}
+            : `<td style="${TD}"></td>`).join('')}
         </tr>`).join('');
 
       // 尚未完成清單
@@ -1675,7 +1677,7 @@
     }
 
     /* ---------- 組別重新命名 ---------- */
-    const TEAM_KEY_PREFIXES = ['PM_SYSTEM_ACTIVE_PROJECTS_', 'PM_SYSTEM_ACTIVE_WEEKS_', 'PM_SYSTEM_ACTIVE_DAILY_', 'PM_SYSTEM_ACTIVE_DATE_', 'PM_SYSTEM_ACTIVE_WEEKLY_DATE_', 'PM_SYSTEM_DATA_STAMP_', 'PM_SYSTEM_PREV_'];
+    const TEAM_KEY_PREFIXES = ['PM_SYSTEM_ACTIVE_PROJECTS_', 'PM_SYSTEM_ACTIVE_WEEKS_', 'PM_SYSTEM_ACTIVE_DAILY_', 'PM_SYSTEM_ACTIVE_DATE_', 'PM_SYSTEM_ACTIVE_WEEKLY_DATE_', 'PM_SYSTEM_DATA_STAMP_', 'PM_SYSTEM_PREV_', 'PM_SYSTEM_EMBED_APPLIED_'];
 
     function renameTeam() {
       if (!currentTeam) return;
@@ -1901,7 +1903,7 @@
             <div class="flex items-start gap-3">
               <div class="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center font-black shrink-0">PM</div>
               <div class="space-y-1.5">
-                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM 專案管理系統 <span class="ml-1 align-middle rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold">版本 v1107-D</span></h1>
+                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM 專案管理系統 <span class="ml-1 align-middle rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold">版本 v1107-E</span></h1>
                 <div class="flex flex-wrap items-center gap-2">
                   <div class="flex items-center gap-1 rounded-full bg-white text-slate-800 pl-3 pr-1 py-0.5 shadow-sm border border-teal-200">
                     <span class="text-xs font-bold text-teal-800 whitespace-nowrap">🏷️ 組別:</span>
@@ -2247,4 +2249,4 @@
   </script>
 </body>
 </html>
-<!-- END OF FILE v1107-D：看到這行代表檔案完整 -->
+<!-- END OF FILE v1107-E：看到這行代表檔案完整 -->
