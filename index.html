@@ -148,6 +148,15 @@
       background-color: #0f766e !important;
       color: #ffffff !important;
     }
+    .email-container table.demand-matrix th,
+    .email-container table.demand-matrix td {
+      padding: 5px 3px !important;
+      font-size: 10pt !important;
+      word-break: break-word;
+    }
+    .email-container table.demand-matrix th {
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen antialiased">
@@ -970,6 +979,72 @@
       `;
     }
 
+    /* ---------------- 報表：Demand & PO/PR 查核矩陣（含未完成項目） ---------------- */
+    const DEMAND_CHECKS = [['dfm', 'DFM'], ['quote', '報價'], ['pr_po', 'PR/PO'], ['ko', 'K/O'], ['bom', 'BOM'], ['sw_key', 'SW Key']];
+
+    function isBlankVal(v) {
+      const t = String(v == null ? '' : v).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+      return t === '' || t === '-';
+    }
+
+    function generateDemandMatrixHTML(proj) {
+      const demands = (proj && proj.demands) || [];
+      const TH = 'border: 1px solid #0f766e; background-color: #0f766e; color: #ffffff; font-weight: bold; text-align: center; white-space: nowrap; padding: 5px 3px;';
+      const TD = 'border: 1px solid #94a3b8; padding: 5px 4px; vertical-align: middle;';
+      const PENDING = 'background-color: #fef3c7; color: #b45309; font-weight: bold;';
+      const textCell = (v, align) => isBlankVal(v)
+        ? `<td style="${TD} ${PENDING} text-align: center;">待填</td>`
+        : `<td style="${TD} text-align: ${align};">${v}</td>`;
+
+      const rows = demands.map(d => `
+        <tr style="page-break-inside: avoid; break-inside: avoid;">
+          <td style="${TD} font-weight: bold; text-align: left;">${isBlankVal(d.demand) ? '-' : d.demand}</td>
+          ${textCell(d.qty, 'center')}
+          ${textCell(d.site, 'center')}
+          ${textCell(d.etd, 'center')}
+          ${textCell(d.eta, 'center')}
+          ${DEMAND_CHECKS.map(([k]) => d[k]
+            ? `<td style="${TD} text-align: center; color: #047857; font-weight: bold;">✓</td>`
+            : `<td style="${TD} ${PENDING} text-align: center;">未完成</td>`).join('')}
+        </tr>`).join('');
+
+      // 尚未完成清單
+      const pendingList = demands.map(d => {
+        const miss = [];
+        if (isBlankVal(d.qty)) miss.push('數量');
+        if (isBlankVal(d.site)) miss.push('廠區');
+        if (isBlankVal(d.etd)) miss.push('ETD');
+        if (isBlankVal(d.eta)) miss.push('ETA');
+        DEMAND_CHECKS.forEach(([k, label]) => { if (!d[k]) miss.push(label); });
+        return miss.length ? `<div style="margin: 2px 0;">• <b>${isBlankVal(d.demand) ? '(未命名需求)' : d.demand}</b>：${miss.join('、')}</div>` : '';
+      }).filter(Boolean).join('');
+
+      return `
+        <div style="font-size: 12pt; font-weight: bold; color: #0f766e; margin-bottom: 6px;">📋 Demand & PO/PR 查核矩陣</div>
+        <table class="demand-matrix" style="width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 10pt; margin-bottom: 8px;">
+          <colgroup>
+            <col style="width: 25%;"><col style="width: 6%;"><col style="width: 12%;"><col style="width: 8%;"><col style="width: 8%;">
+            ${DEMAND_CHECKS.map(() => '<col style="width: 6.83%;">').join('')}
+          </colgroup>
+          <thead>
+            <tr>
+              <th style="${TH} text-align: left; padding-left: 6px;">需求項目</th>
+              <th style="${TH}">數量</th><th style="${TH}">廠區</th><th style="${TH}">ETD</th><th style="${TH}">ETA</th>
+              ${DEMAND_CHECKS.map(([, label]) => `<th style="${TH}">${label}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || `<tr><td colspan="11" style="${TD} text-align: center; color: #64748b;">尚無需求項目</td></tr>`}
+          </tbody>
+        </table>
+        ${pendingList ? `
+          <div class="avoid-break" style="border: 1px solid #fcd34d; background-color: #fffbeb; border-radius: 6px; padding: 6px 10px; margin-bottom: 12px; font-size: 10.5pt; line-height: 1.5; page-break-inside: avoid; break-inside: avoid;">
+            <div style="font-weight: bold; color: #b45309; margin-bottom: 2px;">⏳ 尚未完成 / 待收集項目</div>
+            ${pendingList}
+          </div>` : `
+          <div style="font-size: 10.5pt; color: #047857; font-weight: bold; margin-bottom: 12px;">✓ 所有需求項目皆已完成</div>`}`;
+    }
+
     /* ---------------- 報表與郵件 HTML 生成（支援自適應方向） ---------------- */
     function generateReportHTML(isForPrint = false) {
       const curProj = (projects && projects.length > 0) ? (projects.find(p => p.id === selectedId) || projects[0]) : {};
@@ -1044,32 +1119,8 @@
 
             <!-- 第二頁獨立區塊 (自動換頁不腰斬) -->
             <div class="avoid-break" style="page-break-before: always; break-before: page; page-break-inside: avoid; break-inside: avoid; margin-top: 16px;">
-              <!-- 需求矩陣 -->
-              <div style="font-size: 12pt; font-weight: bold; color: #0f766e; margin-bottom: 6px;">📋 Demand & PO/PR 查核矩陣</div>
-              <table style="width: 100%; border-collapse: collapse; font-size: 11pt; margin-bottom: 12px;">
-                <thead>
-                  <tr style="background-color: #f1f5f9; color: #1e293b;">
-                    <th style="border: 1px solid #94a3b8; padding: 5px 6px; text-align: left;">需求項目</th>
-                    <th style="border: 1px solid #94a3b8; padding: 5px 4px; width: 45px; text-align: center;">數量</th>
-                    <th style="border: 1px solid #94a3b8; padding: 5px 6px; width: 85px;">廠區</th>
-                    <th style="border: 1px solid #94a3b8; padding: 5px 6px; width: 75px; text-align: center;">ETD</th>
-                    <th style="border: 1px solid #94a3b8; padding: 5px 4px; width: 45px; text-align: center;">DFM</th>
-                    <th style="border: 1px solid #94a3b8; padding: 5px 4px; width: 45px; text-align: center;">PO</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${(curProj.demands || []).map(d => `
-                    <tr>
-                      <td style="border: 1px solid #94a3b8; padding: 5px 6px; font-weight: bold;">${d.demand || '-'}</td>
-                      <td style="border: 1px solid #94a3b8; padding: 5px 4px; text-align: center;">${d.qty || '-'}</td>
-                      <td style="border: 1px solid #94a3b8; padding: 5px 6px;">${d.site || '-'}</td>
-                      <td style="border: 1px solid #94a3b8; padding: 5px 6px; text-align: center;">${d.etd || '-'}</td>
-                      <td style="border: 1px solid #94a3b8; padding: 5px 4px; text-align: center; font-weight: bold; color: #047857;">${d.dfm ? '✓' : '-'}</td>
-                      <td style="border: 1px solid #94a3b8; padding: 5px 4px; text-align: center;">${d.pr_po ? '✓' : '-'}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
+              <!-- 需求矩陣（含未完成項目） -->
+              ${generateDemandMatrixHTML(curProj)}
 
               <!-- 歷程週記 -->
               <div style="font-size: 12pt; font-weight: bold; color: #0f766e; margin: 14px 0 6px 0;">📝 Project Progress (歷程週記)</div>
@@ -1739,7 +1790,7 @@
             <div class="flex items-start gap-3">
               <div class="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center font-black shrink-0">PM</div>
               <div class="space-y-1.5">
-                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM 專案管理系統 <span class="ml-1 align-middle rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold">版本 v1106-C</span></h1>
+                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM 專案管理系統 <span class="ml-1 align-middle rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold">版本 v1107-A</span></h1>
                 <div class="flex flex-wrap items-center gap-2">
                   <div class="flex items-center gap-1 rounded-full bg-white text-slate-800 pl-3 pr-1 py-0.5 shadow-sm border border-teal-200">
                     <span class="text-xs font-bold text-teal-800 whitespace-nowrap">🏷️ 組別:</span>
@@ -1851,7 +1902,7 @@
         return `
           <tr>
             ${txt('demand', 'min-w-[220px]')}${txt('qty', 'w-16')}${txt('site', 'min-w-[110px]')}${txt('etd', 'w-20')}${txt('eta', 'w-20')}
-            ${checks.map(([k]) => `<td class="border border-slate-200 p-1 text-center w-14"><input type="checkbox" class="w-4 h-4 accent-teal-700" ${d[k] ? 'checked' : ''} onchange="commitDemand('${pid}', '${did}', '${k}', this.checked)" /></td>`).join('')}
+            ${checks.map(([k]) => `<td class="border border-slate-200 p-1 text-center w-14 ${d[k] ? '' : 'bg-amber-50'}" title="${d[k] ? '已完成' : '未完成'}"><input type="checkbox" class="w-4 h-4 accent-teal-700" ${d[k] ? 'checked' : ''} onchange="commitDemand('${pid}', '${did}', '${k}', this.checked)" /></td>`).join('')}
             <td class="border border-slate-200 p-1 text-center w-10"><button type="button" class="text-slate-400 hover:text-rose-600" title="刪除" onclick="if (confirm('確定刪除這筆需求？')) deleteDemand('${pid}', '${did}')">✕</button></td>
           </tr>`;
       }).join('');
@@ -2076,4 +2127,4 @@
   </script>
 </body>
 </html>
-<!-- END OF FILE v1106-C：看到這行代表檔案完整 -->
+<!-- END OF FILE v1107-A：看到這行代表檔案完整 -->
