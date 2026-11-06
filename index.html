@@ -10,7 +10,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     @page {
-      size: A4 landscape;
       margin: 8mm 6mm;
     }
     @media print {
@@ -76,20 +75,17 @@
     }
 
     /* 富文字編輯器樣式：徹底禁用 list-style，去除任何黑點 */
+    .rich-editor, .rich-editor * {
+      list-style-type: none !important;
+      list-style: none !important;
+    }
     .rich-editor {
       min-height: 48px;
       outline: none;
       word-break: break-word;
       white-space: pre-wrap;
-      list-style-type: none !important;
-      list-style: none !important;
-    }
-    .rich-editor * {
-      list-style-type: none !important;
-      list-style: none !important;
     }
     .rich-editor li {
-      list-style-type: none !important;
       display: block !important;
     }
     .rich-editor:empty:before {
@@ -152,14 +148,14 @@
 
   <input type="file" id="globalImageUploader" accept="image/*" class="hidden" onchange="handleFileSelected(event)" />
 
-  <!-- 浮動文字選色工具列 (onmousedown preventDefault 保證反白不丟失) -->
-  <div id="inlineFormatBar" class="hidden fixed z-50 bg-white border border-slate-300 rounded-lg shadow-2xl p-1.5 flex items-center gap-1.5 text-xs transition-opacity">
+  <!-- 浮動反白選色工具列 (最高層級與防失焦保護) -->
+  <div id="inlineFormatBar" style="z-index: 999999; display: none;" class="fixed bg-white border border-slate-300 rounded-lg shadow-2xl p-1.5 flex items-center gap-1.5 text-xs transition-opacity">
     <span class="text-[11px] font-bold text-slate-500 pl-1">文字色彩:</span>
-    <button type="button" onmousedown="applyTextColor('#0f172a', event)" class="w-5 h-5 rounded bg-slate-900 border border-slate-400" title="黑色"></button>
-    <button type="button" onmousedown="applyTextColor('#e11d48', event)" class="w-5 h-5 rounded bg-rose-600 border border-rose-700" title="紅色"></button>
-    <button type="button" onmousedown="applyTextColor('#2563eb', event)" class="w-5 h-5 rounded bg-blue-600 border border-blue-700" title="藍色"></button>
-    <button type="button" onmousedown="applyTextColor('#059669', event)" class="w-5 h-5 rounded bg-emerald-600 border border-emerald-700" title="綠色"></button>
-    <button type="button" onmousedown="applyTextColor('#d97706', event)" class="w-5 h-5 rounded bg-amber-600 border border-amber-700" title="橘色"></button>
+    <button type="button" onmousedown="applyTextColor('#0f172a', event)" class="w-5 h-5 rounded bg-slate-900 border border-slate-400 hover:scale-110 transition" title="黑色"></button>
+    <button type="button" onmousedown="applyTextColor('#e11d48', event)" class="w-5 h-5 rounded bg-rose-600 border border-rose-700 hover:scale-110 transition" title="紅色"></button>
+    <button type="button" onmousedown="applyTextColor('#2563eb', event)" class="w-5 h-5 rounded bg-blue-600 border border-blue-700 hover:scale-110 transition" title="藍色"></button>
+    <button type="button" onmousedown="applyTextColor('#059669', event)" class="w-5 h-5 rounded bg-emerald-600 border border-emerald-700 hover:scale-110 transition" title="綠色"></button>
+    <button type="button" onmousedown="applyTextColor('#d97706', event)" class="w-5 h-5 rounded bg-amber-600 border border-amber-700 hover:scale-110 transition" title="橘色"></button>
     <div class="h-4 w-px bg-slate-200 mx-0.5"></div>
     <input type="color" onmousedown="saveSelectionBeforeColor(event)" onchange="applyTextColor(this.value, event)" class="w-6 h-5 rounded cursor-pointer border border-slate-300 bg-transparent p-0" title="自訂色彩" />
   </div>
@@ -327,6 +323,9 @@
     let currentTeam = urlParams.get('team') || urlParams.get('group') || '';
     currentTeam = currentTeam.replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, '').trim();
 
+    // 預設 PDF 匯出方向 (可自由切換)
+    let selectedPdfOrientation = 'landscape';
+
     const DEFAULT_WEEKS = [
       { "id": "w1", "week": "WK32", "month": "Aug-26", "date": "8/3" },
       { "id": "w2", "week": "WK33", "month": "Aug-26", "date": "8/10" },
@@ -355,7 +354,7 @@
     // 徹底將 li / ul / ol / p 標籤消除，保證無任何黑點
     function cleanHtmlString(str) {
       if (!str) return '';
-      return str
+      return String(str)
         .replace(/<\/?(?:ul|ol)[^>]*>/gi, '')
         .replace(/<li[^>]*>/gi, '<div>')
         .replace(/<\/li>/gi, '</div>')
@@ -540,8 +539,11 @@
       try {
         const storedProj = localStorage.getItem(STORAGE_KEY_PROJ);
         projects = storedProj ? JSON.parse(storedProj) : ((currentTeam === 'Jane') ? JSON.parse(JSON.stringify(JANE_INITIAL_PROJECTS)) : createBlankProject());
+        // 載入時徹底清洗所有黑點
         projects.forEach(p => {
           (p.progress_logs || []).forEach(l => l.content = cleanHtmlString(l.content));
+          p.special_issue = cleanHtmlString(p.special_issue);
+          p.todo_plan = cleanHtmlString(p.todo_plan);
         });
 
         const storedWeeks = localStorage.getItem(STORAGE_KEY_WEEK);
@@ -549,6 +551,9 @@
 
         const storedDaily = localStorage.getItem(STORAGE_KEY_DAILY);
         dailyReports = storedDaily ? JSON.parse(storedDaily) : ((currentTeam === 'Jane') ? JSON.parse(JSON.stringify(JANE_INITIAL_DAILY)) : createBlankDaily());
+        dailyReports.forEach(d => {
+          d.actions = (d.actions || []).map(a => cleanHtmlString(a));
+        });
 
         const storedDailyDate = localStorage.getItem(STORAGE_KEY_DAILY_DATE);
         if (storedDailyDate) dailyReportDate = storedDailyDate;
@@ -597,12 +602,14 @@
       } 
     }
 
-    /* ---------------- 全域反白文字選取工具列與色彩變更 ---------------- */
+    /* ---------------- 全域反白文字選色機制 ---------------- */
     let currentSavedRange = null;
+
     function checkSelection(e) {
       const selection = window.getSelection();
       const formatBar = document.getElementById('inlineFormatBar');
       if (!formatBar) return;
+      
       if (!selection.isCollapsed && selection.toString().trim() !== '') {
         const range = selection.getRangeAt(0);
         let container = range.commonAncestorContainer;
@@ -611,13 +618,13 @@
           currentSavedRange = range.cloneRange();
           const rect = range.getBoundingClientRect();
           formatBar.style.left = `${Math.max(10, rect.left + window.scrollX)}px`;
-          formatBar.style.top = `${Math.max(10, rect.top + window.scrollY - 42)}px`;
-          formatBar.classList.remove('hidden');
+          formatBar.style.top = `${Math.max(10, rect.top + window.scrollY - 48)}px`;
+          formatBar.style.display = 'flex';
           return;
         }
       }
       if (!e.target || !e.target.closest('#inlineFormatBar')) {
-        formatBar.classList.add('hidden');
+        formatBar.style.display = 'none';
       }
     }
 
@@ -651,7 +658,7 @@
       });
     }
 
-    /* ---------------- 全域貼上監聽：防 Outlook 變形與表格支援 ---------------- */
+    /* ---------------- 貼上過濾：徹底清除 li 黑點 ---------------- */
     function handleRichPaste(e, onSaveCallback) {
       const clipboardData = e.clipboardData || window.clipboardData;
       if (!clipboardData) return;
@@ -674,21 +681,10 @@
       }
 
       const htmlText = clipboardData.getData('text/html');
-      if (htmlText && (htmlText.indexOf('<table') !== -1 || htmlText.indexOf('<tr') !== -1)) {
+      if (htmlText && (htmlText.indexOf('<table') !== -1 || htmlText.indexOf('<tr') !== -1 || htmlText.indexOf('<li') !== -1)) {
         e.preventDefault();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(htmlText, 'text/html');
-        const tables = doc.querySelectorAll('table');
-        if (tables.length > 0) {
-          tables.forEach(t => {
-            t.removeAttribute('style');
-            t.className = 'w-full my-2 border border-slate-300';
-            t.querySelectorAll('td, th').forEach(cell => cell.removeAttribute('style'));
-          });
-          document.execCommand('insertHTML', false, tables[0].outerHTML);
-        } else {
-          document.execCommand('insertHTML', false, cleanHtmlString(htmlText));
-        }
+        const cleaned = cleanHtmlString(htmlText);
+        document.execCommand('insertHTML', false, cleaned);
         if (onSaveCallback) onSaveCallback();
       }
     }
@@ -932,7 +928,7 @@
       const weekCols = ganttWeeks.map(w => {
         const m = (proj.milestones && proj.milestones[w.id]);
         const textVal = m ? (typeof m === 'object' ? m.text : m) : '';
-        const hasTask = textVal && textVal.trim() !== '' && textVal.trim() !== '-')[cite: 10];
+        const hasTask = textVal && textVal.trim() !== '' && textVal.trim() !== '-';
         const bg = (m && typeof m === 'object' && m.bg) ? m.bg : '#dbeafe';
         const col = (m && typeof m === 'object' && m.color) ? m.color : '#1e40af';
 
@@ -967,13 +963,14 @@
       `;
     }
 
-    /* ---------------- 生成直向 12pt 郵件專用排版 ---------------- */
-    function generateEmailPortraitHTML() {
+    /* ---------------- 報表與郵件 HTML 生成（支援自適應方向） ---------------- */
+    function generateReportHTML(isForPrint = false) {
       const curProj = (projects && projects.length > 0) ? (projects.find(p => p.id === selectedId) || projects[0]) : {};
+      const containerWidth = selectedPdfOrientation === 'portrait' ? '760px' : '1060px';
 
       if (viewMode === 'daily') {
         return `
-          <div class="email-container" style="max-width: 720px; margin: 0 auto; background: #ffffff; padding: 12px; font-family: Calibri, Arial, 'Microsoft JhengHei', sans-serif; font-size: 12pt; color: #1e293b;">
+          <div class="email-container" style="max-width: ${containerWidth}; margin: 0 auto; background: #ffffff; padding: 12px; font-family: Calibri, Arial, 'Microsoft JhengHei', sans-serif; font-size: 12pt; color: #1e293b;">
             <div style="border-bottom: 3px solid #0f766e; padding-bottom: 8px; margin-bottom: 12px;">
               <h2 style="font-size: 16pt; font-weight: bold; color: #0f766e; margin: 0;">Daily Report (${currentTeam})</h2>
               <div style="font-size: 11pt; color: #64748b; margin-top: 4px;">報告日期: ${dailyReportDate}</div>
@@ -991,13 +988,13 @@
               </thead>
               <tbody>
                 ${(dailyReports || []).map((item, idx) => `
-                  <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+                  <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; page-break-inside: avoid; break-inside: avoid;">
                     <td style="border: 1px solid #94a3b8; padding: 8px 6px; text-align: center; font-weight: bold; vertical-align: top;">${item.no}</td>
                     <td style="border: 1px solid #94a3b8; padding: 8px 10px; font-weight: bold; color: #0f766e; vertical-align: top;">${item.project}</td>
                     <td style="border: 1px solid #94a3b8; padding: 8px 10px; line-height: 1.5; vertical-align: top;">
-                      <ul style="margin: 0; padding-left: 18px; list-style: none;">
-                        ${(item.actions || []).map(act => `<li style="margin-bottom: 6px; list-style: none;">${cleanHtmlString(act)}</li>`).join('')}
-                      </ul>
+                      <div style="margin: 0;">
+                        ${(item.actions || []).map(act => `<div style="margin-bottom: 6px;">• ${cleanHtmlString(act)}</div>`).join('')}
+                      </div>
                     </td>
                     <td style="border: 1px solid #94a3b8; padding: 8px 6px; text-align: center; vertical-align: top; font-weight: bold;">${item.risk || 'Normal'}</td>
                     <td style="border: 1px solid #94a3b8; padding: 8px 6px; text-align: center; vertical-align: top;">${item.checkpoint || 'Daily Check'}</td>
@@ -1009,9 +1006,9 @@
         `;
       } else {
         return `
-          <div class="email-container" style="max-width: 720px; margin: 0 auto; background: #ffffff; padding: 12px; font-family: Calibri, Arial, 'Microsoft JhengHei', sans-serif; font-size: 12pt; color: #1e293b;">
+          <div class="email-container" style="max-width: ${containerWidth}; margin: 0 auto; background: #ffffff; padding: 12px; font-family: Calibri, Arial, 'Microsoft JhengHei', sans-serif; font-size: 12pt; color: #1e293b;">
             <!-- 第一頁區塊 -->
-            <div class="avoid-break" style="margin-bottom: 16px;">
+            <div class="avoid-break" style="page-break-inside: avoid; break-inside: avoid; margin-bottom: 16px;">
               <div style="border-bottom: 3px solid #0f766e; padding-bottom: 8px; margin-bottom: 12px;">
                 <h2 style="font-size: 16pt; font-weight: bold; color: #0f766e; margin: 0;">Weekly Report: ${curProj.project || '專案'} (${curProj.fixture || '治具名稱'})</h2>
                 <div style="font-size: 11pt; color: #64748b; margin-top: 4px;">報告日期: ${weeklyReportDate} • 組別: ${currentTeam} • 階段: ${curProj.phase || '-'}</div>
@@ -1038,7 +1035,7 @@
             </div>
 
             <!-- 第二頁獨立區塊 (自動換頁不腰斬) -->
-            <div class="avoid-break" style="page-break-before: always; break-before: page; margin-top: 16px;">
+            <div class="avoid-break" style="page-break-before: always; break-before: page; page-break-inside: avoid; break-inside: avoid; margin-top: 16px;">
               <!-- 需求矩陣 -->
               <div style="font-size: 12pt; font-weight: bold; color: #0f766e; margin-bottom: 6px;">📋 Demand & PO/PR 查核矩陣</div>
               <table style="width: 100%; border-collapse: collapse; font-size: 11pt; margin-bottom: 12px;">
@@ -1069,14 +1066,14 @@
               <!-- 歷程週記 -->
               <div style="font-size: 12pt; font-weight: bold; color: #0f766e; margin: 14px 0 6px 0;">📝 Project Progress (歷程週記)</div>
               ${(curProj.progress_logs || []).map(l => `
-                <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; background: #f8fafc;">
+                <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; background: #f8fafc; page-break-inside: avoid; break-inside: avoid;">
                   <div style="font-weight: bold; color: #0f766e; margin-bottom: 4px; font-size: 11pt;">-[${l.week}]</div>
                   <div style="font-size: 12pt; line-height: 1.5;">${cleanHtmlString(l.content) || '無日誌紀錄'}</div>
                 </div>
               `).join('')}
 
               <!-- 待辦事項 -->
-              <table style="width: 100%; border-collapse: collapse; font-size: 12pt; margin-top: 10px;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 12pt; margin-top: 10px; page-break-inside: avoid; break-inside: avoid;">
                 <tr>
                   <td style="width: 50%; vertical-align: top; border: 1px solid #fde68a; background-color: #fefce8; padding: 8px;">
                     <div style="font-weight: bold; color: #854d0e; margin-bottom: 4px;">⚠️ Special Issue / Call Help</div>
@@ -1093,6 +1090,10 @@
           </div>
         `;
       }
+    }
+
+    function generateEmailPortraitHTML() {
+      return generateReportHTML(false);
     }
 
     function openEmailCopyModal() {
@@ -1178,24 +1179,26 @@
       downloadTableAsExcel(reportHtml, `Daily_Report_${currentTeam || 'Group'}_${dailyReportDate}.xls`);
     }
 
-    /* ---------------- PDF 匯出（防跨頁裁切優化版） ---------------- */
+    /* ---------------- PDF 匯出（自選橫向/直向 + 防跨頁裁切 Smart Page-Break） ---------------- */
+    function setPdfOrientation(val) {
+      selectedPdfOrientation = val;
+    }
+
     function downloadWeeklyReportPDF() {
       try {
-        const reportHtml = generateEmailPortraitHTML();
+        const reportHtml = generateReportHTML(true);
         const tempContainer = document.createElement('div');
         tempContainer.innerHTML = reportHtml;
-        tempContainer.querySelectorAll('table, .avoid-break, div').forEach(node => {
-          node.style.pageBreakInside = 'avoid';
-          node.style.breakInside = 'avoid';
-        });
         document.body.appendChild(tempContainer);
 
+        const isPortrait = selectedPdfOrientation === 'portrait';
         const opt = {
           margin: [8, 8, 8, 8],
           filename: `PM_Weekly_Report_${currentTeam || 'Group'}_${weeklyReportDate}.pdf`,
           image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0, windowWidth: 780 },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+          html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0, windowWidth: isPortrait ? 800 : 1100 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: selectedPdfOrientation },
+          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
         };
 
         if (typeof html2pdf !== 'undefined') {
@@ -1216,21 +1219,19 @@
 
     function downloadDailyReportPDF() {
       try {
-        const reportHtml = generateEmailPortraitHTML();
+        const reportHtml = generateReportHTML(true);
         const tempContainer = document.createElement('div');
         tempContainer.innerHTML = reportHtml;
-        tempContainer.querySelectorAll('table, .avoid-break, div').forEach(node => {
-          node.style.pageBreakInside = 'avoid';
-          node.style.breakInside = 'avoid';
-        });
         document.body.appendChild(tempContainer);
 
+        const isPortrait = selectedPdfOrientation === 'portrait';
         const opt = {
           margin: [8, 8, 8, 8],
           filename: `Daily_Report_${currentTeam || 'Group'}_${dailyReportDate}.pdf`,
           image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0, windowWidth: 780 },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+          html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0, windowWidth: isPortrait ? 800 : 1100 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: selectedPdfOrientation },
+          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
         };
 
         if (typeof html2pdf !== 'undefined') {
@@ -1467,9 +1468,14 @@
               projects = data.projects;
               projects.forEach(p => {
                 (p.progress_logs || []).forEach(l => l.content = cleanHtmlString(l.content));
+                p.special_issue = cleanHtmlString(p.special_issue);
+                p.todo_plan = cleanHtmlString(p.todo_plan);
               });
               if (data.weeks) weeks = data.weeks;
               if (data.dailyReports) dailyReports = data.dailyReports;
+              dailyReports.forEach(d => {
+                d.actions = (d.actions || []).map(a => cleanHtmlString(a));
+              });
               if (data.dailyReportDate) dailyReportDate = data.dailyReportDate;
               if (data.weeklyReportDate) weeklyReportDate = data.weeklyReportDate;
               selectedId = projects[0] ? projects[0].id : '';
@@ -1532,6 +1538,15 @@
                 <button type="button" onclick="setViewMode('master')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'master' ? 'bg-white text-teal-800 shadow-sm font-bold' : 'text-slate-600'}">總排程</button>
                 <button type="button" onclick="setViewMode('detail')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'detail' ? 'bg-white text-teal-800 shadow-sm font-bold' : 'text-slate-600'}">單頁週報</button>
                 <button type="button" onclick="setViewMode('daily')" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md transition ${viewMode === 'daily' ? 'bg-teal-700 text-white shadow-sm font-bold' : 'text-teal-700 font-bold hover:bg-slate-200'}">📋 Daily Report</button>
+              </div>
+
+              <!-- PDF 版面方向控制器 -->
+              <div class="flex items-center gap-1 bg-white border border-slate-300 px-2 py-1 rounded-lg text-xs shadow-sm">
+                <span class="font-bold text-slate-600">PDF方向:</span>
+                <select onchange="setPdfOrientation(this.value)" class="bg-transparent font-bold text-teal-800 focus:outline-none cursor-pointer">
+                  <option value="landscape" ${selectedPdfOrientation === 'landscape' ? 'selected' : ''}>橫向 (Landscape)</option>
+                  <option value="portrait" ${selectedPdfOrientation === 'portrait' ? 'selected' : ''}>直向 (Portrait)</option>
+                </select>
               </div>
 
               <!-- 專用：複製直向 12pt 郵件格式 -->
@@ -1881,10 +1896,18 @@
                 <input type="text" value="${curProj.schedule_desc || ''}" placeholder="例如: 需求 11/4 ETA 交付工廠，數量 2 套" onblur="commitField('${curProj.id}', 'schedule_desc', this.value)" class="w-full p-2 bg-white border border-slate-300 rounded focus:ring-1 focus:ring-teal-500 focus:outline-none text-xs" />
               </div>
 
-              <!-- 4. Project Progress (Process 歷程日誌，徹底去除黑點) -->
+              <!-- 4. Project Progress (Process 歷程日誌，加設頂部常駐選色按鈕與去黑點) -->
               <div class="border border-slate-300 rounded-lg overflow-hidden avoid-break">
                 <div class="bg-slate-100 px-3 py-2 font-bold text-slate-800 border-b border-slate-300 flex items-center justify-between text-xs">
-                  <span>Project Progress (Process 歷程日誌)</span>
+                  <div class="flex items-center gap-2">
+                    <span>Project Progress (Process 歷程日誌)</span>
+                    <span class="text-[11px] text-slate-400">| 反白選字改色:</span>
+                    <button type="button" onmousedown="applyTextColor('#0f172a', event)" class="w-4 h-4 rounded-full bg-slate-900 border border-slate-400" title="黑"></button>
+                    <button type="button" onmousedown="applyTextColor('#e11d48', event)" class="w-4 h-4 rounded-full bg-rose-600 border border-rose-700" title="紅"></button>
+                    <button type="button" onmousedown="applyTextColor('#2563eb', event)" class="w-4 h-4 rounded-full bg-blue-600 border border-blue-700" title="藍"></button>
+                    <button type="button" onmousedown="applyTextColor('#059669', event)" class="w-4 h-4 rounded-full bg-emerald-600 border border-emerald-700" title="綠"></button>
+                    <button type="button" onmousedown="applyTextColor('#d97706', event)" class="w-4 h-4 rounded-full bg-amber-600 border border-amber-700" title="橘"></button>
+                  </div>
                   <button type="button" onclick="addLog('${curProj.id}')" class="no-print text-xs text-teal-700 hover:text-teal-900 font-semibold">+ 新增週次日誌</button>
                 </div>
                 <div class="p-2 sm:p-3 space-y-2.5 max-h-[380px] overflow-y-auto touch-scroll">
@@ -1902,7 +1925,7 @@
                       </div>
                       <div 
                         contenteditable="true"
-                        placeholder="請輸入文字，支援反白改顏色、直接貼上截圖與表格..."
+                        placeholder="請輸入文字，反白後點擊顏色按鈕改色，無任何多餘黑點..."
                         onpaste="handleRichPaste(event, () => commitLogHTML('${curProj.id}', '${log.id}', this.innerHTML))"
                         onblur="commitLogHTML('${curProj.id}', '${log.id}', this.innerHTML)"
                         class="rich-editor w-full text-xs p-2 bg-white border border-slate-300 rounded focus:ring-1 focus:ring-teal-500 text-slate-800"
@@ -1915,7 +1938,13 @@
               <!-- Special Issue 與 To-do plan -->
               <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 avoid-break">
                 <div class="border border-amber-300 bg-amber-50/30 rounded-lg p-2.5 sm:p-3">
-                  <div class="font-bold text-amber-900 mb-1 text-xs">Special Issue / Highlight / Call Help</div>
+                  <div class="flex items-center justify-between mb-1">
+                    <div class="font-bold text-amber-900 text-xs">Special Issue / Highlight / Call Help</div>
+                    <div class="flex items-center gap-1">
+                      <button type="button" onmousedown="applyTextColor('#e11d48', event)" class="w-3.5 h-3.5 rounded-full bg-rose-600" title="紅"></button>
+                      <button type="button" onmousedown="applyTextColor('#2563eb', event)" class="w-3.5 h-3.5 rounded-full bg-blue-600" title="藍"></button>
+                    </div>
+                  </div>
                   <div 
                     contenteditable="true"
                     placeholder="請輸入事項，支援反白改顏色..."
@@ -1926,7 +1955,13 @@
                 </div>
 
                 <div class="border border-teal-300 bg-teal-50/30 rounded-lg p-2.5 sm:p-3">
-                  <div class="font-bold text-teal-900 mb-1 text-xs">To-do plan（下週待辦行動方案）</div>
+                  <div class="flex items-center justify-between mb-1">
+                    <div class="font-bold text-teal-900 text-xs">To-do plan（下週待辦行動方案）</div>
+                    <div class="flex items-center gap-1">
+                      <button type="button" onmousedown="applyTextColor('#059669', event)" class="w-3.5 h-3.5 rounded-full bg-emerald-600" title="綠"></button>
+                      <button type="button" onmousedown="applyTextColor('#2563eb', event)" class="w-3.5 h-3.5 rounded-full bg-blue-600" title="藍"></button>
+                    </div>
+                  </div>
                   <div 
                     contenteditable="true"
                     placeholder="請輸入待辦行動，支援反白改顏色..."
