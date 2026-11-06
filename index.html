@@ -578,6 +578,10 @@
       selectedId = (projects && projects[0]) ? projects[0].id : '';
     }
 
+    let lastSaveOk = true;
+    let lastSavedAt = null;
+    let lastSaveError = '';
+
     function saveState() {
       if (!currentTeam) return;
       try {
@@ -586,8 +590,57 @@
         localStorage.setItem(`PM_SYSTEM_ACTIVE_DAILY_${currentTeam}`, JSON.stringify(dailyReports));
         localStorage.setItem(`PM_SYSTEM_ACTIVE_DATE_${currentTeam}`, dailyReportDate);
         localStorage.setItem(`PM_SYSTEM_ACTIVE_WEEKLY_DATE_${currentTeam}`, weeklyReportDate);
-      } catch (e) {}
+        lastSaveOk = true;
+        lastSavedAt = new Date();
+        lastSaveError = '';
+      } catch (e) {
+        // 以前這裡會「默默失敗」：瀏覽器空間滿了也不會提示，重新整理後資料就變回舊的
+        lastSaveOk = false;
+        lastSaveError = (e && e.name === 'QuotaExceededError') || /quota/i.test(String(e && e.message))
+          ? '瀏覽器儲存空間已滿（通常是週記或日報裡的截圖太多、太大）'
+          : String((e && e.message) || e);
+      }
+      if (typeof updateSaveIndicator === 'function') updateSaveIndicator();
     }
+
+    function getStorageUsageMB() {
+      let chars = 0;
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i) || '';
+          chars += k.length + (localStorage.getItem(k) || '').length;
+        }
+      } catch (e) {}
+      return chars * 2 / 1024 / 1024; // 瀏覽器以 UTF-16 計算，約 5MB 上限
+    }
+
+    function updateSaveIndicator() {
+      const el = document.getElementById('saveIndicator');
+      const banner = document.getElementById('saveErrorBanner');
+      const usage = getStorageUsageMB();
+      if (el) {
+        if (lastSaveOk) {
+          const t = lastSavedAt ? `${String(lastSavedAt.getHours()).padStart(2, '0')}:${String(lastSavedAt.getMinutes()).padStart(2, '0')}:${String(lastSavedAt.getSeconds()).padStart(2, '0')}` : '-';
+          el.textContent = `✓ 已自動儲存 ${t} ｜ 已用空間約 ${usage.toFixed(1)} / 5 MB`;
+          el.className = 'text-[11px] font-semibold ' + (usage > 4 ? 'text-amber-200' : 'text-teal-100');
+        } else {
+          el.textContent = '⚠️ 儲存失敗，最近的修改沒有存到！';
+          el.className = 'text-[11px] font-bold text-rose-200';
+        }
+      }
+      if (banner) {
+        banner.hidden = lastSaveOk;
+        if (!lastSaveOk) {
+          banner.innerHTML = `⚠️ <b>儲存失敗：</b>${esc(lastSaveError)}。最近的修改<b>沒有存到</b>，重新整理後會不見。請立刻按「💾 備份匯出」保存目前畫面上的資料，再刪除一些不需要的截圖（或改貼較小的圖片）。`;
+        }
+      }
+    }
+
+    // 關閉 / 重新整理 / 切換分頁前，把正在編輯中的內容存起來
+    window.addEventListener('beforeunload', () => { try { saveActiveEditorContent(); saveState(); } catch (e) {} });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') { try { saveActiveEditorContent(); saveState(); } catch (e) {} }
+    });
 
     function switchTeam(newTeam) {
       if (newTeam === currentTeam) return;
@@ -897,7 +950,8 @@
     }
 
     function resetDailyReport() {
-      if (confirm(`確定要將 [組別: ${currentTeam || '目前組別'}] 的 Daily Report 還原回預設範本嗎？`)) {
+      if (confirm(`⚠️ 這會把 [組別: ${currentTeam || '目前組別'}] 的日報「清空並換成預設範本」，目前的日報內容會被取代。\n\n（如果您是想讀回備份檔，請改按上方「📂 備份匯入」）\n\n系統會先自動下載一份備份。確定要繼續嗎？`)) {
+        exportBackup();
         dailyReports = (currentTeam === 'Jane') ? JSON.parse(JSON.stringify(JANE_INITIAL_DAILY)) : createBlankDaily();
         saveState();
         renderApp();
@@ -1461,7 +1515,8 @@
     }
 
     function resetToInitialData() {
-      if (confirm(`確定要將 [組別: ${currentTeam}] 的週報資料還原回預設嗎？`)) {
+      if (confirm(`⚠️ 這會把 [組別: ${currentTeam}] 的週報「清空並換成預設範本」，目前所有專案、週記、需求矩陣都會被取代。\n\n（如果您是想讀回備份檔，請改按上方「📂 備份匯入」）\n\n系統會先自動下載一份備份。確定要繼續嗎？`)) {
+        exportBackup();
         try {
           localStorage.removeItem(`PM_SYSTEM_ACTIVE_PROJECTS_${currentTeam}`);
           localStorage.removeItem(`PM_SYSTEM_ACTIVE_WEEKS_${currentTeam}`);
@@ -1729,7 +1784,8 @@
           return;
         }
         const target = currentTeam || data.team || '';
-        if (!confirm(`將以備份檔（組別: ${data.team || '未標示'}，匯出時間: ${data.exportDate || '-'}）覆蓋目前 [組別: ${target}] 的所有資料，確定嗎？`)) return;
+        if (!confirm(`將以備份檔（組別: ${data.team || '未標示'}，匯出時間: ${data.exportDate || '-'}）覆蓋目前 [組別: ${target}] 的所有資料。\n\n系統會先自動下載一份目前資料的備份，以防萬一。確定嗎？`)) return;
+        if (currentTeam && projects && projects.length) exportBackup();
         if (!currentTeam && data.team) {
           currentTeam = String(data.team).replace(/[^a-zA-Z0-9_\-一-龥]/g, '');
           try {
@@ -1768,7 +1824,7 @@
           <button type="button" class="${BTN_PRIMARY}" onclick="runReport('${mode}', ${pdfFn})">📄 匯出 PDF</button>
           <button type="button" class="${BTN_GHOST}" onclick="runReport('${mode}', ${xlsFn})">📊 匯出 Excel</button>
           <button type="button" class="${BTN_GHOST}" onclick="runReport('${mode}', openEmailCopyModal)">✉️ 郵件格式複製</button>
-          <button type="button" class="${BTN_DANGER}" onclick="${isW ? 'resetToInitialData()' : 'resetDailyReport()'}">↺ 還原預設</button>
+          <button type="button" class="${BTN_DANGER}" onclick="${isW ? 'resetToInitialData()' : 'resetDailyReport()'}">↺ 重設為範本</button>
         </div>`;
     }
 
@@ -1790,7 +1846,7 @@
             <div class="flex items-start gap-3">
               <div class="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center font-black shrink-0">PM</div>
               <div class="space-y-1.5">
-                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM 專案管理系統 <span class="ml-1 align-middle rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold">版本 v1107-A</span></h1>
+                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM 專案管理系統 <span class="ml-1 align-middle rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold">版本 v1107-B</span></h1>
                 <div class="flex flex-wrap items-center gap-2">
                   <div class="flex items-center gap-1 rounded-full bg-white text-slate-800 pl-3 pr-1 py-0.5 shadow-sm border border-teal-200">
                     <span class="text-xs font-bold text-teal-800 whitespace-nowrap">🏷️ 組別:</span>
@@ -1802,6 +1858,7 @@
                   </div>
                   <span class="text-xs text-teal-100">組別: ${esc(currentTeam || '-')} 專屬空間 (?team=${esc(currentTeam || '')}) ｜ 👤 ${esc(user)}</span>
                 </div>
+                <div id="saveIndicator" class="text-[11px] font-semibold text-teal-100"></div>
               </div>
             </div>
             <div class="flex flex-wrap items-center gap-2">
@@ -2110,13 +2167,15 @@
       const scrollY = window.scrollY;
       currentSavedRange = null;
       app.innerHTML = `
+        <div id="saveErrorBanner" hidden class="no-print rounded-xl border border-rose-300 bg-rose-50 text-rose-800 text-sm px-4 py-3"></div>
         ${renderHeader()}
         ${renderColorBar()}
         ${viewMode !== 'daily' ? renderWeeklySection() : ''}
         ${viewMode !== 'weekly' ? renderDailySection() : ''}
-        <footer class="text-center text-[11px] text-slate-400 py-2 no-print">資料儲存在此瀏覽器中（依組別分開）。換電腦或清除瀏覽器資料前，請先按「備份匯出」。</footer>`;
+        <footer class="text-center text-[11px] text-slate-400 py-2 no-print">資料只存在「這台電腦的這個瀏覽器、這個網址」裡（依組別分開）。本機開的檔案、GitHub 網址、不同瀏覽器或無痕視窗，彼此看不到對方的資料。換地方使用前，請先按「備份匯出」，到新地方再「備份匯入」。</footer>`;
 
       app.querySelectorAll('input[data-ms]').forEach(el => liveColorBadge(el));
+      updateSaveIndicator();
       window.scrollTo(0, scrollY);
     }
 
@@ -2127,4 +2186,4 @@
   </script>
 </body>
 </html>
-<!-- END OF FILE v1107-A：看到這行代表檔案完整 -->
+<!-- END OF FILE v1107-B：看到這行代表檔案完整 -->
