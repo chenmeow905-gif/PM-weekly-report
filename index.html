@@ -148,6 +148,22 @@
       background-color: #0f766e !important;
       color: #ffffff !important;
     }
+    .email-container table.gantt-table td {
+      padding: 3px 2px !important;
+      border-color: #cbd5e1 !important;
+    }
+    .email-container table.gantt-table td.g-week {
+      border-bottom: none !important;
+      padding-bottom: 2px !important;
+    }
+    .email-container table.gantt-table td.g-phase {
+      padding: 1px 3px !important;
+      border-top: none !important;
+      border-bottom: none !important;
+    }
+    .email-container table.gantt-table td.g-content {
+      border-top: none !important;
+    }
     .email-container table.demand-matrix th,
     .email-container table.demand-matrix td {
       padding: 5px 3px !important;
@@ -1006,6 +1022,21 @@
     }
 
     /* ---------------- 【動態全覆蓋精緻甘特圖】 ---------------- */
+    // 客戶階段細條顏色（每個專案各自設定；預設深綠）
+    const PHASE_DEFAULT_COLOR = '#0f766e';
+    function phaseBarColors(proj) {
+      const bg = (proj && /^#[0-9a-fA-F]{6}$/.test(proj.phase_color || '')) ? proj.phase_color : PHASE_DEFAULT_COLOR;
+      const r = parseInt(bg.slice(1, 3), 16), g = parseInt(bg.slice(3, 5), 16), b = parseInt(bg.slice(5, 7), 16);
+      const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      return { bg, fg: lum > 0.6 ? '#0f172a' : '#ffffff' };   // 淺色底配深色字
+    }
+
+    function setPhaseColor(projId, color) {
+      projects = projects.map(p => p.id === projId ? { ...p, phase_color: color } : p);
+      saveState();
+      renderApp();
+    }
+
     function generateGanttChartHTML(proj) {
       if (!proj) return '';
 
@@ -1042,30 +1073,54 @@
       const cellPadding = isCompact ? '4px 2px' : '6px 4px';
       const taskPadding = isCompact ? '3px 2px' : '4px 5px';
 
-      const weekCols = ganttWeeks.map(w => {
+      // 每週：週次列 / 客戶階段細條 / 里程碑內容 三列（週次共用，階段與內容依專案）
+      const cellInfo = ganttWeeks.map(w => {
         const m = (proj.milestones && proj.milestones[w.id]);
         const textVal = m ? (typeof m === 'object' ? m.text : m) : '';
-        const hasTask = textVal && textVal.trim() !== '' && textVal.trim() !== '-';
+        const hasTask = !!(textVal && textVal.trim() !== '' && textVal.trim() !== '-');
         const bg = (m && typeof m === 'object' && m.bg) ? m.bg : '#dbeafe';
         const col = (m && typeof m === 'object' && m.color) ? m.color : '#1e40af';
+        return { w, textVal, hasTask, bg, col };
+      });
+      const cellBg = c => c.hasTask ? '#f0fdfa' : '#ffffff';
+      const BORDER = '1px solid #cbd5e1';
 
-        return `
-          <td style="width: ${colWidthPercent}%; border: 1px solid #cbd5e1; padding: ${cellPadding}; text-align: center; vertical-align: top; background: ${hasTask ? '#f0fdfa' : '#ffffff'}; word-break: break-word;">
-            <div style="font-size: ${weekFontSize}; font-weight: bold; color: ${hasTask ? '#0f766e' : '#475569'}; margin-bottom: 1px; line-height: 1.1;">${w.week}</div>
-            <div style="font-size: ${dateFontSize}; color: #94a3b8; margin-bottom: 5px; line-height: 1;">${w.date}</div>
-            ${hasTask ? `
-              <div style="background-color: ${bg}; color: ${col}; border-radius: 4px; padding: ${taskPadding}; font-size: ${taskFontSize}; font-weight: bold; line-height: 1.25; border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 1px 2px rgba(0,0,0,0.05); text-align: center;">
-                ${textVal}
+      const weekRow = cellInfo.map(c => `
+          <td class="g-week" style="width: ${colWidthPercent}%; border: ${BORDER}; border-bottom: none; padding: 4px 2px 2px 2px; text-align: center; vertical-align: top; background: ${cellBg(c)};">
+            <div style="font-size: ${weekFontSize}; font-weight: bold; color: ${c.hasTask ? '#0f766e' : '#475569'}; margin-bottom: 1px; line-height: 1.1;">${c.w.week}</div>
+            <div style="font-size: ${dateFontSize}; color: #94a3b8; line-height: 1;">${c.w.date}</div>
+          </td>`).join('');
+
+      // 客戶階段細條：從第一個有內容的週到最後一個有內容的週
+      const phaseText = (typeof plain === 'function' ? plain(proj.phase) : String(proj.phase || '')).trim();
+      const activeIdx = cellInfo.map((c, i) => c.hasTask ? i : -1).filter(i => i >= 0);
+      let phaseRow = '';
+      if (phaseText && activeIdx.length) {
+        const s0 = Math.min(...activeIdx), e0 = Math.max(...activeIdx), n = cellInfo.length;
+        const blank = (from, to) => cellInfo.slice(from, to).map(c => `<td class="g-phase" style="border: ${BORDER}; border-top: none; border-bottom: none; padding: 1px 0; background: ${cellBg(c)}; height: 12px;"></td>`).join('');
+        phaseRow = `
+          <tr>
+            ${blank(0, s0)}
+            <td class="g-phase" colspan="${e0 - s0 + 1}" style="border: ${BORDER}; border-top: none; border-bottom: none; padding: 1px 3px; background: #f0fdfa;">
+              <div style="height: 12px; line-height: 12px; background: ${phaseBarColors(proj).bg}; color: ${phaseBarColors(proj).fg}; border-radius: 6px; font-size: 7.5pt; font-weight: bold; padding: 0 8px; text-align: left; white-space: nowrap; overflow: hidden; letter-spacing: .3px;">${phaseText}</div>
+            </td>
+            ${blank(e0 + 1, n)}
+          </tr>`;
+      }
+
+      const contentRow = cellInfo.map(c => `
+          <td class="g-content" style="width: ${colWidthPercent}%; border: ${BORDER}; border-top: none; padding: 3px 2px 4px 2px; text-align: center; vertical-align: top; background: ${cellBg(c)}; word-break: break-word;">
+            ${c.hasTask ? `
+              <div style="background-color: ${c.bg}; color: ${c.col}; border-radius: 4px; padding: ${taskPadding}; font-size: ${taskFontSize}; font-weight: bold; line-height: 1.25; border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 1px 2px rgba(0,0,0,0.05); text-align: center;">
+                ${c.textVal}
               </div>
             ` : `
-              <div style="height: 4px; background-color: #e2e8f0; border-radius: 2px; margin: 10px auto 4px auto; width: 75%;"></div>
+              <div style="height: 4px; background-color: #e2e8f0; border-radius: 2px; margin: 8px auto 4px auto; width: 75%;"></div>
             `}
-          </td>
-        `;
-      }).join('');
+          </td>`).join('');
 
       return `
-        <table style="width: 100%; border-collapse: collapse; table-layout: fixed; margin: 10px 0; background: #ffffff;">
+        <table class="gantt-table" style="width: 100%; border-collapse: collapse; table-layout: fixed; margin: 10px 0; background: #ffffff;">
           <thead>
             <tr style="background-color: #0f766e; color: #ffffff;">
               <th colspan="${ganttWeeks.length}" style="border: 1px solid #0f766e; padding: 6px 10px; font-size: 11pt; text-align: left; font-weight: bold; background-color: #0f766e; color: #ffffff;">
@@ -1074,7 +1129,9 @@
             </tr>
           </thead>
           <tbody>
-            <tr>${weekCols}</tr>
+            <tr>${weekRow}</tr>
+            ${phaseRow}
+            <tr>${contentRow}</tr>
           </tbody>
         </table>
       `;
@@ -2019,7 +2076,7 @@
             <div class="flex items-start gap-3">
               <div class="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center font-black shrink-0">PM</div>
               <div class="space-y-1.5">
-                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM 專案管理系統 <span class="ml-1 align-middle rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold">版本 v1110-A</span></h1>
+                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM 專案管理系統 <span class="ml-1 align-middle rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold">版本 v1110-C</span></h1>
                 <div class="flex flex-wrap items-center gap-2">
                   <div class="flex items-center gap-1 rounded-full bg-white text-slate-800 pl-3 pr-1 py-0.5 shadow-sm border border-teal-200">
                     <span class="text-xs font-bold text-teal-800 whitespace-nowrap">🏷️ 組別:</span>
@@ -2074,14 +2131,38 @@
             </td>`;
         }).join('');
         const isSel = p.id === selectedId;
+        // 客戶階段細條（WK 下方、內容上方；依每個專案自己的「階段」與里程碑範圍）
+        const phaseText = plain(p.phase);
+        const act = weeks.map((w, i) => {
+          const m = (p.milestones && p.milestones[w.id]) || '';
+          const t = typeof m === 'object' ? (m.text || '') : m;
+          return t && t.trim() && t.trim() !== '-' ? i : -1;
+        }).filter(i => i >= 0);
+        let phaseRow = '';
+        if (phaseText && act.length) {
+          const s0 = Math.min(...act), e0 = Math.max(...act);
+          const blank = n => n > 0 ? `<td colspan="${n}" class="border-x border-slate-200 p-0 h-3"></td>` : '';
+          phaseRow = `
+            <tr class="${isSel ? 'bg-teal-50/60' : ''}">
+              ${blank(s0)}
+              <td colspan="${e0 - s0 + 1}" class="border-x border-slate-200 px-1 pt-1 pb-0">
+                <label class="relative block cursor-pointer" title="客戶階段：${esc(phaseText)}（點一下可改顏色）">
+                  <div class="h-3 leading-3 rounded-full text-[9px] font-bold px-2 whitespace-nowrap overflow-hidden" style="background:${phaseBarColors(p).bg};color:${phaseBarColors(p).fg}">${esc(phaseText)}</div>
+                  <input type="color" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" value="${phaseBarColors(p).bg}" onchange="setPhaseColor('${jsq(p.id)}', this.value)" />
+                </label>
+              </td>
+              ${blank(weeks.length - 1 - e0)}
+            </tr>`;
+        }
         return `
           <tr class="${isSel ? 'bg-teal-50/60' : ''}">
-            <td class="sticky-col-1 border border-slate-200 px-2 py-1 align-middle min-w-[150px] ${isSel ? 'bg-teal-50' : 'bg-slate-50'}">
+            <td ${phaseRow ? 'rowspan="2"' : ''} class="sticky-col-1 border border-slate-200 px-2 py-1 align-middle min-w-[150px] ${isSel ? 'bg-teal-50' : 'bg-slate-50'}">
               <button type="button" onclick="selectProject('${jsq(p.id)}')" class="text-left w-full">
                 <div class="text-xs font-bold ${isSel ? 'text-teal-800' : 'text-slate-800'}">${esc(plain(p.project) || '-')}</div>
                 <div class="text-[10px] text-slate-500 truncate max-w-[160px]">${esc(plain(p.fixture))}</div>
               </button>
             </td>
+            ${phaseRow ? phaseRow.replace(/^\s*<tr[^>]*>/, '').replace(/<\/tr>\s*$/, '') + '</tr><tr class="' + (isSel ? 'bg-teal-50/60' : '') + '">' : ''}
             ${cells}
           </tr>`;
       }).join('');
@@ -2123,7 +2204,17 @@
     function renderProjectDetail(p) {
       if (!p) return '';
       const pid = jsq(p.id);
-      const field = ([key, label]) => `
+      const PHASE_PRESETS = ['#0f766e', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#ca8a04', '#64748b'];
+      const field = ([key, label]) => key === 'phase' ? `
+        <div>
+          <span class="flex items-center gap-1 text-[11px] font-bold text-slate-500 mb-0.5">${label}
+            <span class="ml-auto flex items-center gap-0.5" title="甘特圖階段細條顏色">
+              ${PHASE_PRESETS.map(c => `<button type="button" class="w-3.5 h-3.5 rounded-full border ${phaseBarColors(p).bg.toLowerCase() === c ? 'ring-2 ring-offset-1 ring-slate-400' : 'border-black/10'}" style="background:${c}" onclick="setPhaseColor('${pid}', '${c}')"></button>`).join('')}
+              <input type="color" class="w-4 h-4 p-0 border-0 bg-transparent cursor-pointer" value="${phaseBarColors(p).bg}" onchange="setPhaseColor('${pid}', this.value)" title="自訂顏色" />
+            </span>
+          </span>
+          ${richField(p[key], `commitRichField('${pid}', '${key}', __VAL__, true)`)}
+        </div>` : `
         <div>
           <span class="block text-[11px] font-bold text-slate-500 mb-0.5">${label}</span>
           ${richField(p[key], `commitRichField('${pid}', '${key}', __VAL__, ${RERENDER_FIELDS.includes(key)})`)}
@@ -2380,4 +2471,4 @@
   </script>
 </body>
 </html>
-<!-- END OF FILE v1110-A：看到這行代表檔案完整 -->
+<!-- END OF FILE v1110-C：看到這行代表檔案完整 -->
