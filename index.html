@@ -561,6 +561,7 @@
       applyEmbeddedDataIfNewer();
       try { migrateWeekLabels(); } catch (e) { console.warn('week fix error', e); }
       try { migrateShiftMilestonesBack(); } catch (e) { console.warn('milestone shift error', e); }
+      try { migrateNormalizeWeeks(); } catch (e) { console.warn('week normalize error', e); }
       try { normalizeAllRichContent(); } catch (e) { console.warn('normalize error', e); }
       selectedId = (projects && projects[0]) ? projects[0].id : '';
     }
@@ -1646,23 +1647,58 @@
       }
     }
 
+    /* ---------------- 週次與月份：依日期自動推算（跨年時週次從 WK1 重新開始） ---------------- */
+    const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    function parseMonthLabelYear(label) {
+      const m = /^([A-Za-z]{3})-(\d{2})$/.exec(String(label || '').trim());
+      if (!m) return null;
+      return 2000 + parseInt(m[2], 10);
+    }
+
+    // 依照週次清單的日期順序推算年份（日期月份變小代表跨年），再算出正確的「月份標籤」與 ISO 週次
+    function normalizeWeeks(list) {
+      let year = null;
+      let prevMonth = null;
+      return (list || []).map(w => {
+        const md = /^(\d{1,2})\/(\d{1,2})$/.exec(String(w.date || '').trim());
+        if (!md) return w;
+        const mo = parseInt(md[1], 10), da = parseInt(md[2], 10);
+        if (year === null) year = parseMonthLabelYear(w.month) || new Date().getFullYear();
+        else if (prevMonth !== null && mo < prevMonth) year += 1;
+        prevMonth = mo;
+        const d = new Date(year, mo - 1, da);
+        return { ...w, month: `${MONTH_NAMES[mo - 1]}-${String(year).slice(-2)}`, week: `WK${isoWeekOf(d)}` };
+      });
+    }
+
     function addNewWeek() {
-      const lastWeek = weeks[weeks.length - 1];
-      let nextWkNum = 1, nextDate = '1/5', nextMonth = 'Jan-27';
-      if (lastWeek) {
-        const m = lastWeek.week.match(/\d+/);
-        if (m) nextWkNum = parseInt(m[0], 10) + 1;
-        if (lastWeek.date && lastWeek.date.includes('/')) {
-          const [mo, da] = lastWeek.date.split('/').map(n => parseInt(n, 10));
-          const d = new Date(2026, mo - 1, da);
-          d.setDate(d.getDate() + 7);
-          nextDate = `${d.getMonth() + 1}/${d.getDate()}`;
-          const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-          nextMonth = `${monthNames[d.getMonth()]}-${String(d.getFullYear()).slice(-2)}`;
-        }
+      const norm = normalizeWeeks(weeks);
+      const last = norm[norm.length - 1];
+      let nextDate = new Date();
+      if (last && /^\d{1,2}\/\d{1,2}$/.test(String(last.date || '').trim())) {
+        const [mo, da] = last.date.split('/').map(n => parseInt(n, 10));
+        const year = parseMonthLabelYear(last.month) || new Date().getFullYear();
+        nextDate = new Date(year, mo - 1, da + 7);
       }
-      weeks.push({ id: 'w_' + Date.now(), week: `WK${nextWkNum}`, month: nextMonth, date: nextDate });
+      weeks.push({
+        id: 'w_' + Date.now(),
+        week: `WK${isoWeekOf(nextDate)}`,                       // 2027/1/4 → WK1、1/11 → WK2 …
+        month: `${MONTH_NAMES[nextDate.getMonth()]}-${String(nextDate.getFullYear()).slice(-2)}`,
+        date: `${nextDate.getMonth() + 1}/${nextDate.getDate()}`
+      });
+      saveState();
       renderApp();
+    }
+
+    // 一次性修正：之前新增的週別年份算錯（例如 1/11 被標成 Jan-26、WK54），依日期重新推算
+    function migrateNormalizeWeeks() {
+      if (!currentTeam) return;
+      const key = `PM_SYSTEM_MIG_WEEKNORM_${currentTeam}`;
+      try { if (localStorage.getItem(key)) return; } catch (e) {}
+      weeks = normalizeWeeks(weeks);
+      try { localStorage.setItem(key, '1'); } catch (e) {}
+      saveState();
     }
 
     function deleteWeek(id) {
@@ -1753,7 +1789,7 @@
     }
 
     /* ---------- 組別重新命名 ---------- */
-    const TEAM_KEY_PREFIXES = ['PM_SYSTEM_ACTIVE_PROJECTS_', 'PM_SYSTEM_ACTIVE_WEEKS_', 'PM_SYSTEM_ACTIVE_DAILY_', 'PM_SYSTEM_ACTIVE_DATE_', 'PM_SYSTEM_ACTIVE_WEEKLY_DATE_', 'PM_SYSTEM_DATA_STAMP_', 'PM_SYSTEM_PREV_', 'PM_SYSTEM_EMBED_APPLIED_', 'PM_SYSTEM_MIG_WEEKFIX_', 'PM_SYSTEM_MIG_SHIFT1_'];
+    const TEAM_KEY_PREFIXES = ['PM_SYSTEM_ACTIVE_PROJECTS_', 'PM_SYSTEM_ACTIVE_WEEKS_', 'PM_SYSTEM_ACTIVE_DAILY_', 'PM_SYSTEM_ACTIVE_DATE_', 'PM_SYSTEM_ACTIVE_WEEKLY_DATE_', 'PM_SYSTEM_DATA_STAMP_', 'PM_SYSTEM_PREV_', 'PM_SYSTEM_EMBED_APPLIED_', 'PM_SYSTEM_MIG_WEEKFIX_', 'PM_SYSTEM_MIG_SHIFT1_', 'PM_SYSTEM_MIG_WEEKNORM_'];
 
     function renameTeam() {
       if (!currentTeam) return;
@@ -1850,6 +1886,10 @@
 
     function commitWeek(weekId, field, val) {
       weeks = weeks.map(w => w.id === weekId ? { ...w, [field]: val.trim() } : w);
+      if (field === 'date') {
+        const norm = normalizeWeeks(weeks);
+        weeks = weeks.map((w, i) => w.id === weekId ? { ...w, month: norm[i].month, week: norm[i].week } : w);
+      }
       saveState();
       renderApp();
     }
@@ -1979,7 +2019,7 @@
             <div class="flex items-start gap-3">
               <div class="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center font-black shrink-0">PM</div>
               <div class="space-y-1.5">
-                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM 專案管理系統 <span class="ml-1 align-middle rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold">版本 v1107-H</span></h1>
+                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM 專案管理系統 <span class="ml-1 align-middle rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold">版本 v1110-A</span></h1>
                 <div class="flex flex-wrap items-center gap-2">
                   <div class="flex items-center gap-1 rounded-full bg-white text-slate-800 pl-3 pr-1 py-0.5 shadow-sm border border-teal-200">
                     <span class="text-xs font-bold text-teal-800 whitespace-nowrap">🏷️ 組別:</span>
@@ -2340,4 +2380,4 @@
   </script>
 </body>
 </html>
-<!-- END OF FILE v1107-H：看到這行代表檔案完整 -->
+<!-- END OF FILE v1110-A：看到這行代表檔案完整 -->
