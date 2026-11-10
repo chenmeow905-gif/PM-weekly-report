@@ -2054,13 +2054,12 @@
     }
 
     // 一次性修正：之前新增的週別年份算錯（例如 1/11 被標成 Jan-26、WK54），依日期重新推算
+    // 每次開啟都依日期重新核對月份與週次（不再只做一次），避免舊分頁或手動修改留下錯誤的 Jan-26
     function migrateNormalizeWeeks() {
       if (!currentTeam) return;
-      const key = `PM_SYSTEM_MIG_WEEKNORM_${currentTeam}`;
-      try { if (localStorage.getItem(key)) return; } catch (e) {}
+      const before = JSON.stringify(weeks);
       weeks = normalizeWeeks(weeks);
-      try { localStorage.setItem(key, '1'); } catch (e) {}
-      saveState();
+      if (JSON.stringify(weeks) !== before) saveState();
     }
 
     function deleteWeek(id) {
@@ -2381,7 +2380,7 @@
             <div class="flex items-start gap-3">
               <div class="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center font-black shrink-0">PM</div>
               <div class="space-y-1.5">
-                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM 專案管理系統 <span class="ml-1 align-middle rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold">版本 v1110-E</span></h1>
+                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM 專案管理系統 <span class="ml-1 align-middle rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold">版本 v1110-F</span></h1>
                 <div class="flex flex-wrap items-center gap-2">
                   <div class="flex items-center gap-1 rounded-full bg-white text-slate-800 pl-3 pr-1 py-0.5 shadow-sm border border-teal-200">
                     <span class="text-xs font-bold text-teal-800 whitespace-nowrap">🏷️ 組別:</span>
@@ -2746,6 +2745,7 @@
       }
       if (!dailyReports || dailyReports.length === 0) dailyReports = createBlankDaily();
       if (!projects.some(p => p.id === selectedId)) selectedId = projects[0].id;
+      try { weeks = normalizeWeeks(weeks); } catch (e) {}
       saveState();
 
       const scrollY = window.scrollY;
@@ -2776,4 +2776,4 @@
   </script>
 </body>
 </html>
-<!-- END OF FILE v1110-E：看到這行代表檔案完整 -->
+<!-- END OF FILE v1110-F：看到這行代表檔案完整 -->
