@@ -1154,7 +1154,7 @@
 
     function generateDemandMatrixHTML(proj) {
       const demands = (proj && proj.demands) || [];
-      const TH = 'border: 1px solid #0f766e; background-color: #0f766e; color: #ffffff; font-weight: bold; text-align: center; white-space: nowrap; padding: 5px 3px;';
+      const TH = 'border: 1px solid #0f766e; background-color: #0f766e; color: #ffffff; font-weight: bold; text-align: center; padding: 5px 2px; font-size: 9pt; line-height: 1.15;';
       const TD = 'border: 1px solid #94a3b8; padding: 5px 4px; vertical-align: middle;';
       const textCell = (v, align) => isBlankVal(v)
         ? `<td style="${TD}"></td>`
@@ -1255,67 +1255,372 @@
           </div>
         `;
       } else {
-        return `
-          <div class="email-container" style="max-width: ${containerWidth}; margin: 0 auto; background: #ffffff; padding: 12px; font-family: Calibri, Arial, 'Microsoft JhengHei', sans-serif; font-size: 12pt; color: #1e293b;">
-            <!-- 第一頁區塊 -->
-            <div class="avoid-break" style="page-break-inside: avoid; break-inside: avoid; margin-bottom: 16px;">
-              <div style="border-bottom: 3px solid #0f766e; padding-bottom: 8px; margin-bottom: 12px;">
-                <h2 style="font-size: 16pt; font-weight: bold; color: #0f766e; margin: 0;">Weekly Report: ${curProj.project || '專案'} (${curProj.fixture || '治具名稱'})</h2>
-                <div style="font-size: 11pt; color: #64748b; margin-top: 4px;">報告日期: ${weeklyReportDate} • 組別: ${currentTeam} • 階段: ${curProj.phase || '-'}</div>
-              </div>
-
-              <!-- 基本資訊直向排版 -->
-              <table style="width: 100%; border-collapse: collapse; font-size: 12pt; margin-bottom: 12px;">
-                <tr>
-                  <td style="width: 25%; background-color: #f1f5f9; font-weight: bold; border: 1px solid #94a3b8; padding: 6px 8px;">客戶 / CM工廠</td>
-                  <td style="width: 75%; border: 1px solid #94a3b8; padding: 6px 8px;">${curProj.customer || '-'} / ${curProj.cm || '-'}</td>
-                </tr>
-                <tr>
-                  <td style="background-color: #f1f5f9; font-weight: bold; border: 1px solid #94a3b8; padding: 6px 8px;">PM / ME / RD</td>
-                  <td style="border: 1px solid #94a3b8; padding: 6px 8px;">PM: ${curProj.pm || '-'} | ME: ${curProj.me || '-'} | RD: ${curProj.tpe_rd || '-'}</td>
-                </tr>
-                <tr>
-                  <td style="background-color: #f1f5f9; font-weight: bold; border: 1px solid #94a3b8; padding: 6px 8px;">目前狀態 / 交期</td>
-                  <td style="border: 1px solid #94a3b8; padding: 6px 8px; font-weight: bold; color: #0f766e;">狀態: ${curProj.status || '-'} | 交期: ${curProj.deadline || '-'}</td>
-                </tr>
-              </table>
-
-              <!-- 甘特圖（全涵蓋所有進度重點） -->
-              ${generateGanttChartHTML(curProj)}
-            </div>
-
-            <!-- 第二頁獨立區塊 (自動換頁不腰斬) -->
-            <div class="avoid-break" style="page-break-before: always; break-before: page; page-break-inside: avoid; break-inside: avoid; margin-top: 16px;">
-              <!-- 需求矩陣（含未完成項目） -->
-              ${generateDemandMatrixHTML(curProj)}
-
-              <!-- 歷程週記 -->
-              <div style="font-size: 12pt; font-weight: bold; color: #0f766e; margin: 14px 0 6px 0;">📝 Project Progress (歷程週記)</div>
-              ${(curProj.progress_logs || []).map(l => `
-                <div class="log-card" style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; background: #f8fafc; page-break-inside: avoid; break-inside: avoid;">
-                  <div style="font-weight: bold; color: #0f766e; margin-bottom: 4px; font-size: 11pt;">-[${l.week}]</div>
-                  <div style="font-size: 12pt; line-height: 1.5;">${cleanHtmlString(l.content) || '無日誌紀錄'}</div>
-                </div>
-              `).join('')}
-
-              <!-- 待辦事項 -->
-              <table style="width: 100%; border-collapse: collapse; font-size: 12pt; margin-top: 10px; page-break-inside: avoid; break-inside: avoid;">
-                <tr>
-                  <td style="width: 50%; vertical-align: top; border: 1px solid #fde68a; background-color: #fefce8; padding: 8px;">
-                    <div style="font-weight: bold; color: #854d0e; margin-bottom: 4px;">⚠️ Special Issue / Call Help</div>
-                    <div style="font-size: 12pt; line-height: 1.4;">${cleanHtmlString(curProj.special_issue) || '- 目前無重大卡點 (N/A)'}</div>
-                  </td>
-                  <td style="width: 10px;"></td>
-                  <td style="width: 50%; vertical-align: top; border: 1px solid #99f6e4; background-color: #f0fdfa; padding: 8px;">
-                    <div style="font-weight: bold; color: #115e59; margin-bottom: 4px;">🎯 To-do plan (行動方案)</div>
-                    <div style="font-size: 12pt; line-height: 1.4;">${cleanHtmlString(curProj.todo_plan) || '1. 追蹤後續進度。'}</div>
-                  </td>
-                </tr>
-              </table>
-            </div>
-          </div>
-        `;
+        // 週報：第 1 頁全專案甘特圖，之後每個專案一頁（郵件 / Excel 以分隔線區隔）
+        return `<div style="max-width: 1060px; margin: 0 auto; background: #ffffff;">${generateWeeklyReportPages().join('<div style="page-break-before: always; break-before: page; border-top: 2px dashed #cbd5e1; margin: 18px 0;"></div>')}</div>`;
       }
+    }
+
+    /* =====================================================================
+     * 週報（新版版面）：第 1 頁＝全專案甘特圖＋狀態總覽；之後每個專案各一頁
+     * ===================================================================== */
+    const RPT = {
+      font: "Calibri, Arial, 'Microsoft JhengHei', sans-serif",
+      ink: '#1e293b', muted: '#64748b', line: '#cbd5e1', soft: '#f8fafc',
+      teal: '#0f766e', tealSoft: '#f0fdfa', amber: '#b45309', amberSoft: '#fffbeb'
+    };
+
+    function rptHasTask(p, w) {
+      const m = p.milestones && p.milestones[w.id];
+      const t = m ? (typeof m === 'object' ? (m.text || '') : m) : '';
+      return !!(t && t.trim() && t.trim() !== '-');
+    }
+
+    function rptPendingItems(p) {
+      const out = [];
+      (p.demands || []).forEach(d => {
+        const miss = [];
+        if (isBlankVal(d.qty)) miss.push('數量');
+        if (isBlankVal(d.site)) miss.push('廠區');
+        if (isBlankVal(d.etd)) miss.push('ETD');
+        if (isBlankVal(d.eta)) miss.push('ETA');
+        DEMAND_CHECKS.forEach(([k, label]) => { if (demandState(d, k) === 'todo') miss.push(label); });
+        if (miss.length) out.push({ demand: d.demand, miss });
+      });
+      return out;
+    }
+
+    function rptChip(text, bg, fg) {
+      return `<span style="display: inline-block; background: ${bg}; color: ${fg}; border-radius: 999px; padding: 1px 9px; font-size: 9pt; font-weight: bold; margin-right: 6px; white-space: nowrap;">${text}</span>`;
+    }
+
+    function rptSectionTitle(icon, text) {
+      return `<div style="font-size: 10.5pt; font-weight: bold; color: ${RPT.teal}; margin: 0 0 5px 0;">${icon} ${text}</div>`;
+    }
+
+    // ---------- 第 1 頁：全專案甘特圖 ----------
+    function generateAllProjectsGanttHTML() {
+      const list = projects || [];
+      const active = [];
+      list.forEach(p => weeks.forEach((w, i) => { if (rptHasTask(p, w)) active.push(i); }));
+      let s0, e0;
+      if (active.length) {
+        s0 = Math.max(0, Math.min(...active) - 1);
+        e0 = Math.min(weeks.length - 1, Math.max(...active) + 1);
+      } else {
+        e0 = weeks.length - 1;
+        s0 = Math.max(0, e0 - 9);
+      }
+      while (e0 - s0 + 1 < 8 && (e0 < weeks.length - 1 || s0 > 0)) {
+        if (e0 < weeks.length - 1) e0++; else s0--;
+      }
+      const gw = weeks.slice(s0, e0 + 1);
+      const n = gw.length;
+      const compact = n > 12;
+      const fsWeek = compact ? '8.5pt' : '9.5pt', fsDate = compact ? '7pt' : '7.5pt', fsChip = compact ? '7.5pt' : '8.5pt';
+      const thisWeek = currentWeekLabel();
+      const nameW = 13;
+      const colW = ((100 - nameW) / n).toFixed(3);
+
+      // 月份群組
+      const groups = [];
+      gw.forEach(w => {
+        const m = w.month || '';
+        if (groups.length && groups[groups.length - 1].month === m) groups[groups.length - 1].span++;
+        else groups.push({ month: m, span: 1 });
+      });
+
+      const TH = `border: 1px solid ${RPT.line}; padding: 3px 2px; text-align: center; font-weight: bold;`;
+      const head = `
+        <tr>
+          <th rowspan="2" style="${TH} background: #e2e8f0; color: ${RPT.ink}; text-align: left; padding-left: 8px; font-size: 9pt;">專案 / 治具</th>
+          ${groups.map(g => `<th colspan="${g.span}" style="${TH} background: #e2e8f0; color: ${RPT.ink}; font-size: 8.5pt;">${g.month}</th>`).join('')}
+        </tr>
+        <tr>
+          ${gw.map(w => {
+            const now = w.week === thisWeek;
+            return `<th style="${TH} background: ${now ? '#fde68a' : '#f1f5f9'}; color: ${now ? '#92400e' : RPT.ink};">
+              ${now ? `<div style="font-size: 6.5pt; line-height: 1; color: #92400e;">本週</div>` : ''}
+              <div style="font-size: ${fsWeek}; line-height: 1.15;">${w.week}</div>
+              <div style="font-size: ${fsDate}; line-height: 1; color: ${RPT.muted}; font-weight: normal;">${w.date}</div>
+            </th>`;
+          }).join('')}
+        </tr>`;
+
+      const body = list.map((p, pi) => {
+        const zebra = pi % 2 ? '#fcfdfd' : '#ffffff';
+        const idx = gw.map((w, i) => rptHasTask(p, w) ? i : -1).filter(i => i >= 0);
+        const phaseText = plain(p.phase);
+        const showPhase = !!(phaseText && idx.length);
+        const nameCell = `
+          <td rowspan="${showPhase ? 2 : 1}" style="border: 1px solid ${RPT.line}; padding: 4px 8px; vertical-align: middle; background: #f8fafc;">
+            <div style="font-size: 9.5pt; font-weight: bold; color: ${RPT.teal}; line-height: 1.2;">${plain(p.project) || '-'}</div>
+            <div style="font-size: 7.5pt; color: ${RPT.muted}; line-height: 1.25;">${plain(p.fixture)}</div>
+          </td>`;
+        let phaseRow = '';
+        if (showPhase) {
+          const a = Math.min(...idx), b = Math.max(...idx);
+          const c = phaseBarColors(p);
+          const blank = k => k > 0 ? `<td colspan="${k}" style="border-left: 1px solid ${RPT.line}; border-right: 1px solid ${RPT.line}; padding: 0; height: 13px; background: ${zebra};"></td>` : '';
+          phaseRow = `
+            <tr>
+              ${nameCell}
+              ${blank(a)}
+              <td colspan="${b - a + 1}" style="border-left: 1px solid ${RPT.line}; border-right: 1px solid ${RPT.line}; padding: 3px 3px 1px 3px; background: ${zebra};">
+                <div style="height: 11px; line-height: 11px; background: ${c.bg}; color: ${c.fg}; border-radius: 6px; font-size: 7pt; font-weight: bold; padding: 0 8px; white-space: nowrap; overflow: hidden;">${phaseText}</div>
+              </td>
+              ${blank(n - 1 - b)}
+            </tr>`;
+        }
+        const cells = gw.map(w => {
+          const m = p.milestones && p.milestones[w.id];
+          const t = m ? (typeof m === 'object' ? (m.text || '') : m) : '';
+          const has = rptHasTask(p, w);
+          const bg = (m && typeof m === 'object' && m.bg) ? m.bg : '#dbeafe';
+          const fg = (m && typeof m === 'object' && m.color) ? m.color : '#1e40af';
+          const now = w.week === thisWeek;
+          return `<td style="border: 1px solid ${RPT.line}; ${showPhase ? 'border-top: none;' : ''} padding: 3px 2px; text-align: center; vertical-align: middle; background: ${now ? '#fffbeb' : zebra};">
+            ${has ? `<div style="background: ${bg}; color: ${fg}; border-radius: 4px; padding: 2px 2px; font-size: ${fsChip}; font-weight: bold; line-height: 1.2; border: 1px solid rgba(0,0,0,0.06);">${t}</div>` : ''}
+          </td>`;
+        }).join('');
+        return showPhase ? `${phaseRow}<tr>${cells}</tr>` : `<tr>${nameCell}${cells}</tr>`;
+      }).join('');
+
+      return `
+        <table class="gantt-table rpt-gantt" style="width: 100%; border-collapse: collapse; table-layout: fixed; background: #ffffff;">
+          <colgroup><col style="width: ${nameW}%;">${gw.map(() => `<col style="width: ${colW}%;">`).join('')}</colgroup>
+          <thead>${head}</thead>
+          <tbody>${body || `<tr><td colspan="${n + 1}" style="padding: 10px; text-align: center; color: ${RPT.muted};">尚無專案</td></tr>`}</tbody>
+        </table>`;
+    }
+
+    function generateOverviewPageHTML() {
+      const list = projects || [];
+      const TH = `border: 1px solid ${RPT.teal}; background: ${RPT.teal}; color: #ffffff; padding: 4px 6px; font-size: 9pt; text-align: left; white-space: nowrap;`;
+      const TD = `border: 1px solid ${RPT.line}; padding: 4px 6px; font-size: 9pt; vertical-align: middle;`;
+      const rows = list.map(p => {
+        const pend = rptPendingItems(p).reduce((a, x) => a + x.miss.length, 0);
+        const c = phaseBarColors(p);
+        return `<tr>
+          <td style="${TD} font-weight: bold; color: ${RPT.teal};">${plain(p.project) || '-'}</td>
+          <td style="${TD}">${plain(p.fixture) || '-'}</td>
+          <td style="${TD}">${plain(p.customer) || '-'} / ${plain(p.cm) || '-'}</td>
+          <td style="${TD} text-align: center;">${plain(p.phase) ? rptChip(plain(p.phase), c.bg, c.fg) : '-'}</td>
+          <td style="${TD} text-align: center; font-weight: bold; color: ${RPT.teal};">${plain(p.status) || '-'}</td>
+          <td style="${TD}">${plain(p.deadline) || '-'}</td>
+          <td style="${TD}">${plain(p.pm) || '-'}</td>
+          <td style="${TD} text-align: center; font-weight: bold; color: ${pend ? RPT.amber : '#047857'};">${pend ? pend + ' 項' : '✓'}</td>
+        </tr>`;
+      }).join('');
+      return `
+        <div class="pm-report-page" style="font-family: ${RPT.font}; color: ${RPT.ink}; background: #ffffff; padding: 4px 2px;">
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;"><tr>
+            <td style="border: none; border-bottom: 3px solid ${RPT.teal}; padding: 0 0 6px 0;">
+              <div style="font-size: 17pt; font-weight: bold; color: ${RPT.teal}; line-height: 1.2;">PM Weekly Report — 全專案總覽</div>
+              <div style="font-size: 9.5pt; color: ${RPT.muted}; margin-top: 3px;">組別：${currentTeam || '-'}　•　報告日期：${weeklyReportDate}　•　本週：${currentWeekLabel()}　•　共 ${list.length} 個專案</div>
+            </td>
+          </tr></table>
+          ${rptSectionTitle('📊', 'WK 週次時程甘特圖（全專案）')}
+          ${generateAllProjectsGanttHTML()}
+          <div style="height: 12px;"></div>
+          ${rptSectionTitle('📌', '專案狀態總覽')}
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead><tr>
+              <th style="${TH}">專案</th><th style="${TH}">治具</th><th style="${TH}">客戶 / CM 工廠</th><th style="${TH} text-align: center;">階段</th>
+              <th style="${TH} text-align: center;">狀態</th><th style="${TH}">交期</th><th style="${TH}">PM</th><th style="${TH} text-align: center;">待收集</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    }
+
+    // ---------- 每個專案一頁 ----------
+    function generateProjectPageHTML(p, pageNo, total) {
+      const c = phaseBarColors(p);
+      const v = k => plain(p[k]) ? p[k] : '-';
+      const info = [
+        ['客戶 / CM 工廠', `${v('customer')} / ${v('cm')}`],
+        ['地點', v('location')],
+        ['PM / ME / RD', `PM: ${v('pm')}<br>ME: ${v('me')}<br>RD: ${v('tpe_rd')}`],
+        ['EE / SW / FAE', `${v('tt_ee')} / ${v('sw')} / ${v('fae')}`],
+        ['客戶窗口', v('contact_customer')],
+        ['競爭對手', v('competitor')],
+        ['資源配置', v('tt_resources')],
+        ['時程說明', v('schedule_desc')]
+      ];
+      const infoTable = `
+        <table style="width: 100%; border-collapse: collapse; font-size: 9pt;">
+          ${info.map(([k, val]) => `<tr>
+            <td style="width: 30%; background: #f1f5f9; font-weight: bold; border: 1px solid ${RPT.line}; padding: 4px 6px; vertical-align: top;">${k}</td>
+            <td style="border: 1px solid ${RPT.line}; padding: 4px 6px; vertical-align: top; line-height: 1.35;">${val}</td>
+          </tr>`).join('')}
+        </table>`;
+
+      const logCard = l => `
+        <div style="border: 1px solid ${RPT.line}; border-left: 3px solid ${RPT.teal}; border-radius: 4px; padding: 5px 8px; margin-bottom: 6px; background: ${RPT.soft}; page-break-inside: avoid; break-inside: avoid;">
+          <div style="font-weight: bold; color: ${RPT.teal}; font-size: 9.5pt; margin-bottom: 2px;">${l.week}</div>
+          <div style="font-size: 9.5pt; line-height: 1.45;">${cleanHtmlString(l.content) || '—'}</div>
+        </div>`;
+      const allLogs = p.progress_logs || [];
+      let logs;
+      if (!allLogs.length) {
+        logs = `<div style="color: ${RPT.muted}; font-size: 9pt;">尚無週記</div>`;
+      } else if (allLogs.length <= 4) {
+        logs = allLogs.map(logCard).join('');
+      } else {
+        // 週記較多時分兩欄（由上往下、先左後右），讓一頁放得下又不會太小
+        const half = Math.ceil(allLogs.length / 2);
+        logs = `<table style="width: 100%; border-collapse: collapse; table-layout: fixed;"><tr>
+          <td style="width: 50%; vertical-align: top; padding: 0 4px 0 0; border: none;">${allLogs.slice(0, half).map(logCard).join('')}</td>
+          <td style="width: 50%; vertical-align: top; padding: 0 0 0 4px; border: none;">${allLogs.slice(half).map(logCard).join('')}</td>
+        </tr></table>`;
+      }
+
+      const box = (icon, title, html, border, bg, color, fallback) => `
+        <div style="border: 1px solid ${border}; background: ${bg}; border-radius: 6px; padding: 6px 9px; margin-top: 8px;">
+          <div style="font-weight: bold; color: ${color}; font-size: 10pt; margin-bottom: 3px;">${icon} ${title}</div>
+          <div style="font-size: 9.5pt; line-height: 1.45;">${cleanHtmlString(html) || fallback}</div>
+        </div>`;
+
+      return `
+        <div class="pm-report-page" style="font-family: ${RPT.font}; color: ${RPT.ink}; background: #ffffff; padding: 4px 2px;">
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;"><tr>
+            <td style="border: none; border-bottom: 3px solid ${RPT.teal}; padding: 0 0 6px 0; vertical-align: bottom;">
+              <div style="font-size: 15pt; font-weight: bold; color: ${RPT.teal}; line-height: 1.2;">${plain(p.project) || '-'} <span style="color: ${RPT.ink};">${plain(p.fixture) ? '（' + plain(p.fixture) + '）' : ''}</span></div>
+              <div style="margin-top: 5px;">
+                ${plain(p.phase) ? rptChip('階段：' + plain(p.phase), c.bg, c.fg) : ''}
+                ${plain(p.status) ? rptChip('狀態：' + plain(p.status), '#ccfbf1', '#115e59') : ''}
+                ${plain(p.deadline) ? rptChip('交期：' + plain(p.deadline), '#fef3c7', '#92400e') : ''}
+              </div>
+            </td>
+            <td style="border: none; border-bottom: 3px solid ${RPT.teal}; padding: 0 0 6px 0; text-align: right; vertical-align: bottom; font-size: 8.5pt; color: ${RPT.muted}; white-space: nowrap;">
+              報告日期：${weeklyReportDate}<br>組別：${currentTeam || '-'}　•　第 ${pageNo} / ${total} 頁
+            </td>
+          </tr></table>
+
+          ${selectedPdfOrientation === 'portrait' ? `
+            ${rptSectionTitle('🗂️', '基本資訊')}
+            <table style="width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9pt; margin-bottom: 10px;">
+              ${(() => { const rows = []; for (let i = 0; i < info.length; i += 2) rows.push(info.slice(i, i + 2)); return rows.map(r => `<tr>${r.map(([k, val]) => `
+                <td style="width: 15%; background: #f1f5f9; font-weight: bold; border: 1px solid ${RPT.line}; padding: 4px 6px; vertical-align: top;">${k}</td>
+                <td style="width: 35%; border: 1px solid ${RPT.line}; padding: 4px 6px; vertical-align: top; line-height: 1.35;">${val}</td>`).join('')}</tr>`).join(''); })()}
+            </table>
+            ${generateDemandMatrixHTML(p)}
+            ${rptSectionTitle('📝', 'Project Progress（歷程週記）')}
+            ${logs}
+            <table style="width: 100%; border-collapse: collapse; table-layout: fixed;"><tr>
+              <td style="width: 50%; vertical-align: top; padding: 0 5px 0 0; border: none;">${box('⚠️', 'Special Issue / Call Help', p.special_issue, '#fde68a', '#fefce8', '#854d0e', '- 目前無重大卡點 (N/A)')}</td>
+              <td style="width: 50%; vertical-align: top; padding: 0 0 0 5px; border: none;">${box('🎯', 'To-do plan（行動方案）', p.todo_plan, '#99f6e4', '#f0fdfa', '#115e59', '—')}</td>
+            </tr></table>
+          ` : `
+          <table style="width: 100%; border-collapse: collapse; table-layout: fixed;"><tr>
+            <td style="width: 37%; vertical-align: top; padding: 0 10px 0 0; border: none;">
+              ${rptSectionTitle('🗂️', '基本資訊')}
+              ${infoTable}
+              ${box('⚠️', 'Special Issue / Call Help', p.special_issue, '#fde68a', '#fefce8', '#854d0e', '- 目前無重大卡點 (N/A)')}
+              ${box('🎯', 'To-do plan（行動方案）', p.todo_plan, '#99f6e4', '#f0fdfa', '#115e59', '—')}
+            </td>
+            <td style="width: 63%; vertical-align: top; padding: 0; border: none;">
+              ${generateDemandMatrixHTML(p)}
+              ${rptSectionTitle('📝', 'Project Progress（歷程週記）')}
+              ${logs}
+            </td>
+          </tr></table>`}
+        </div>`;
+    }
+
+    function generateWeeklyReportPages() {
+      const list = projects || [];
+      const total = list.length + 1;
+      return [generateOverviewPageHTML(), ...list.map((p, i) => generateProjectPageHTML(p, i + 2, total))];
+    }
+
+    // ---------- 多頁 PDF：每一頁自動縮放到剛好一頁 ----------
+    function shrinkGanttChips(root) {
+      root.querySelectorAll('td > div[style*="border-radius: 4px"]').forEach(chip => {
+        chip.style.overflowWrap = 'normal';
+        chip.style.wordBreak = 'normal';
+        let size = parseFloat(chip.style.fontSize || getComputedStyle(chip).fontSize) || 8;
+        let guard = 0;
+        while (chip.scrollWidth > chip.clientWidth + 1 && size > 5.5 && guard++ < 14) {
+          size -= 0.5;
+          chip.style.fontSize = size + 'pt';
+        }
+        if (chip.scrollWidth > chip.clientWidth + 1) chip.style.wordBreak = 'break-all';
+      });
+    }
+
+    function exportPagedPDF(pagesHtml, filename) {
+      const isPortrait = selectedPdfOrientation === 'portrait';
+      const marginMm = 8;
+      const pageWmm = (isPortrait ? 210 : 297) - marginMm * 2;
+      const pageHmm = (isPortrait ? 297 : 210) - marginMm * 2;
+      const contentW = Math.floor(pageWmm * 96 / 25.4) - 4;
+      const contentH = Math.floor(pageHmm * 96 / 25.4) - 8;
+
+      const holder = document.createElement('div');
+      holder.style.cssText = 'position: fixed; left: -20000px; top: 0;';
+      document.body.appendChild(holder);
+
+      const pages = pagesHtml.map(html => {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = `width: ${contentW}px; background: #ffffff; overflow: hidden; position: relative;`;
+        const inner = document.createElement('div');
+        inner.style.cssText = `width: ${contentW}px; transform-origin: top left; background: #ffffff;`;
+        inner.innerHTML = html;
+        wrap.appendChild(inner);
+        holder.appendChild(wrap);
+        // 內容太長時把版面加寬再整體縮小，讓每一頁剛好放進一張 A4
+        // 先最多加寬 30%（讓文字少換行），還放不下就等比例縮小並置中
+        let w = contentW;
+        let h = inner.scrollHeight;
+        let guard = 0;
+        while (h * contentW / w > contentH && w < contentW * 1.3 && guard++ < 10) {
+          w = Math.ceil(w * 1.05);
+          inner.style.width = w + 'px';
+          h = inner.scrollHeight;
+        }
+        shrinkGanttChips(inner);
+        h = inner.scrollHeight;
+        let scale = contentW / w;
+        if (h * scale > contentH) scale = contentH / h;
+        if (scale < 1) {
+          inner.style.transform = `scale(${scale})`;
+          const visualW = w * scale;
+          if (visualW < contentW - 2) inner.style.marginLeft = Math.floor((contentW - visualW) / 2) + 'px';
+        }
+        wrap.style.height = Math.min(contentH, Math.ceil(h * Math.min(1, scale)) + 2) + 'px';
+        return wrap;
+      });
+
+      const prevScrollX = window.scrollX, prevScrollY = window.scrollY;
+      window.scrollTo(0, 0);
+      const cleanup = () => {
+        if (holder.parentNode) document.body.removeChild(holder);
+        window.scrollTo(prevScrollX, prevScrollY);
+      };
+
+      const opt = {
+        margin: [marginMm, marginMm, marginMm, marginMm],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.97 },
+        html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0, windowWidth: document.documentElement.clientWidth },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: selectedPdfOrientation },
+        pagebreak: { mode: [] }
+      };
+
+      if (typeof html2pdf === 'undefined') { cleanup(); printWithOrientation(); return; }
+
+      let worker = html2pdf().set(opt).from(pages[0]).toPdf();
+      pages.slice(1).forEach(el => {
+        worker = worker.get('pdf').then(pdf => { pdf.addPage(); }).from(el).toContainer().toCanvas().toPdf();
+      });
+      worker.save()
+        .then(cleanup)
+        .catch(err => {
+          console.error('PDF 匯出失敗，改用列印：', err);
+          cleanup();
+          printWithOrientation();
+        });
     }
 
     function generateEmailPortraitHTML() {
@@ -1510,7 +1815,7 @@
     function downloadWeeklyReportPDF() {
       try {
         activeReportMode = 'weekly';
-        exportReportPDF(`PM_Weekly_Report_${currentTeam || 'Group'}_${weeklyReportDate}.pdf`);
+        exportPagedPDF(generateWeeklyReportPages(), `PM_Weekly_Report_${currentTeam || 'Group'}_${weeklyReportDate}.pdf`);
       } catch (e) {
         console.error(e);
         printWithOrientation();
@@ -2076,7 +2381,7 @@
             <div class="flex items-start gap-3">
               <div class="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center font-black shrink-0">PM</div>
               <div class="space-y-1.5">
-                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM 專案管理系統 <span class="ml-1 align-middle rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold">版本 v1110-C</span></h1>
+                <h1 class="text-lg sm:text-xl font-bold leading-tight">PM 專案管理系統 <span class="ml-1 align-middle rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold">版本 v1110-E</span></h1>
                 <div class="flex flex-wrap items-center gap-2">
                   <div class="flex items-center gap-1 rounded-full bg-white text-slate-800 pl-3 pr-1 py-0.5 shadow-sm border border-teal-200">
                     <span class="text-xs font-bold text-teal-800 whitespace-nowrap">🏷️ 組別:</span>
@@ -2471,4 +2776,4 @@
   </script>
 </body>
 </html>
-<!-- END OF FILE v1110-C：看到這行代表檔案完整 -->
+<!-- END OF FILE v1110-E：看到這行代表檔案完整 -->
